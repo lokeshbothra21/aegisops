@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.2 |
+| Document version | 1.0.3 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -836,6 +836,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.0 | 13 Sep 2026 | Initial master plan; supersedes `AEGISOPS_SCOPE.md` |
 | 1.0.1 | 14 Sep 2026 | Phase 0 done. Demo pinned to tag 3.0.0 **and** `DEMO_VERSION=3.0.0` in `.env.override` (floating `latest-payment` image was broken). Minimal mode measured at ~2.4 GB RAM. flagd config: `src/flagd/demo.flagd.json` (input for E2.1). |
 | 1.0.2 | 14 Sep 2026 | Grafana 13 thrashed at the demo's 175 MB limit (650% CPU, unresponsive). Fixed live with `docker update --memory 400m grafana`. **Persist in W1:** `infra/otel-demo/compose.aegisops.yaml` override sets grafana memory 400M and is passed with `-f` in our Makefile wrapper (E1.3 scope widened). |
+| 1.0.3 | 14 Sep 2026 | Backlog: ERP as second target after freeze; added constraint that target-specific values live in `config/targets/`. |
 
 ---
 
@@ -847,7 +848,8 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 - Kubernetes backend for actions
 - Fine-tuned classifier replacing LLM triage (FR-19 if not done in W12)
 - Multi-tenant + SSO
-- ERP/store-management AI layer (separate project, after AegisOps)
+- **Connect the real ERP as a second target (first item after freeze).** Instrument `erp-backend` with the OTel SDK (auto-instrumentation for web framework + DB driver, logs bridged with trace IDs) → collector → AegisOps `/ingest`. Add a deploy hook posting `change_events(type=deploy)`. Reuse the compose action backend. Value: validation on unscripted faults with 10–15 real users. Design constraint it imposes **now**: nothing in AegisOps may hardcode demo service names, flags or actions; all target-specific values live in `config/targets/<name>.yaml`.
+- ERP/store-management AI features (separate project, after AegisOps)
 
 ---
 
