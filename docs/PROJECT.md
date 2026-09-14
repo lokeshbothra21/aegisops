@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.3 |
+| Document version | 1.0.4 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -279,7 +279,7 @@ flowchart LR
 
 | Component | Tech | Responsibility |
 |---|---|---|
-| `aegisops-api` | Python 3.12, FastAPI, SQLAlchemy 2, Alembic | Ingest, alerts scheduler, incidents, runs (SSE), approvals, bench results |
+| `aegisops-api` | Python 3.13, FastAPI, SQLAlchemy 2, Alembic | Ingest, alerts scheduler, incidents, runs (SSE), approvals, bench results |
 | `agent` package | LangGraph, Pydantic v2, LiteLLM-style thin router (own code) | Graph, nodes, schemas, budgets, verifier |
 | `tools` package | MCP Python SDK | Read-only telemetry MCP server; actions module (not MCP) |
 | `alerts` package | Python, APScheduler | Rule evaluation, incident opening |
@@ -332,7 +332,7 @@ stateDiagram-v2
 
 | Layer | Choice | Why (short) | Alternatives rejected |
 |---|---|---|---|
-| Language | Python 3.12 | Ecosystem for LangGraph/MCP; your strength | — |
+| Language | Python 3.13 | Ecosystem for LangGraph/MCP; your strength | — |
 | API | FastAPI | Async, SSE, Pydantic-native | Flask, Django |
 | Agent | LangGraph 1.x | Durable checkpoints, interrupts, streaming | CrewAI (no durable HITL), hand-rolled loop |
 | Tools | MCP (read-only) | Standard, on your resume, clean authz boundary | Direct functions only (kept for actions) |
@@ -585,7 +585,7 @@ aegisops/
 - Tags `v0.x.y` at each milestone; `CHANGELOG.md` via conventional commits.
 
 ### 14.3 Code
-- Python 3.12, `uv`, `ruff` (lint+format), `mypy --strict` on packages, Pydantic v2 everywhere at boundaries, `structlog`.
+- Python 3.13, `uv`, `ruff` (lint+format), `mypy --strict` on packages, Pydantic v2 everywhere at boundaries, `structlog`.
 - TypeScript strict, ESLint, Prettier, no `any`.
 - Pre-commit: ruff, mypy (packages), prettier, eslint, `detect-secrets`, trailing whitespace, YAML lint.
 - No business logic in route handlers; nodes are pure functions of state + tools; tools are thin over SQL.
@@ -837,6 +837,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.1 | 14 Sep 2026 | Phase 0 done. Demo pinned to tag 3.0.0 **and** `DEMO_VERSION=3.0.0` in `.env.override` (floating `latest-payment` image was broken). Minimal mode measured at ~2.4 GB RAM. flagd config: `src/flagd/demo.flagd.json` (input for E2.1). |
 | 1.0.2 | 14 Sep 2026 | Grafana 13 thrashed at the demo's 175 MB limit (650% CPU, unresponsive). Fixed live with `docker update --memory 400m grafana`. **Persist in W1:** `infra/otel-demo/compose.aegisops.yaml` override sets grafana memory 400M and is passed with `-f` in our Makefile wrapper (E1.3 scope widened). |
 | 1.0.3 | 14 Sep 2026 | Backlog: ERP as second target after freeze; added constraint that target-specific values live in `config/targets/`. |
+| 1.0.4 | 14 Sep 2026 | Python 3.12 → 3.13 (newest with prebuilt wheels for all deps; 3.14 too fresh). W1 D1 scaffold started on `feat/E11.1-repo-scaffold`. |
 
 ---
 
