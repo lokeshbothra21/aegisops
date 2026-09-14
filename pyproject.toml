@@ -1,0 +1,52 @@
+[project]
+name = "aegisops"
+version = "0.0.0"
+description = "Autonomous incident-response agent over real OpenTelemetry data"
+readme = "README.md"
+requires-python = ">=3.13,<3.14"
+license = "Apache-2.0"
+
+[tool.uv.workspace]
+members = ["apps/api", "packages/agent", "packages/tools", "packages/alerts"]
+
+[tool.uv.sources]
+aegisops-agent = { workspace = true }
+aegisops-tools = { workspace = true }
+aegisops-alerts = { workspace = true }
+
+[dependency-groups]
+dev = [
+  "ruff>=0.15",
+  "mypy>=1.19",
+  "pytest>=9",
+  "pytest-asyncio>=1.3",
+  "pytest-cov>=7",
+  "httpx>=0.28",
+  "pre-commit>=4.5",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["apps/api/src", "packages/*/src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "S", "N", "ASYNC", "RUF"]
+ignore = ["S101"]  # assert is fine in tests
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S105", "S106"]
+
+[tool.mypy]
+python_version = "3.13"
+strict = true
+plugins = ["pydantic.mypy"]
+mypy_path = "apps/api/src:packages/agent/src:packages/tools/src:packages/alerts/src"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["apps/api/tests", "packages/*/tests"]
+addopts = "-q --strict-markers"
+
+[tool.coverage.run]
+source = ["aegisops_api", "aegisops_agent", "aegisops_tools", "aegisops_alerts"]
