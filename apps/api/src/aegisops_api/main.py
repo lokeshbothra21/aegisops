@@ -11,6 +11,7 @@ import structlog
 from fastapi import FastAPI
 
 from aegisops_api import __version__
+from aegisops_api.db import create_engine, create_session_factory
 from aegisops_api.logging import configure_logging
 from aegisops_api.routes import health
 from aegisops_api.settings import Settings, get_settings
@@ -20,12 +21,18 @@ log = structlog.get_logger()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-    """Startup/shutdown hook. Day 2: open and close the database engine here."""
+    """Startup: logging + database engine. Shutdown: return connections to the pool."""
     settings: Settings = app.state.settings
     configure_logging(settings)
+    engine = create_engine(settings)
+    app.state.engine = engine
+    app.state.session_factory = create_session_factory(engine)
     log.info("api.start", env=settings.env, version=__version__)
-    yield
-    log.info("api.stop")
+    try:
+        yield
+    finally:
+        await engine.dispose()
+        log.info("api.stop")
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

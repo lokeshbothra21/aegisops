@@ -12,6 +12,10 @@ dependencies = [
   "aegisops-agent",
   "aegisops-tools",
   "aegisops-alerts",
+  "sqlalchemy[asyncio]>=2.0.45",
+  "asyncpg>=0.31",
+  "alembic>=1.18",
+  "pgvector>=0.4",
 ]
 
 [build-system]

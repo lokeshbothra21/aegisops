@@ -2,17 +2,18 @@
 
 - /healthz answers as soon as the process is up. Cloud Run uses it to decide the
   container is alive.
-- /readyz answers only when dependencies are usable. Today that is a stub; on
-  Day 2 it pings the database. A failing /readyz keeps a broken revision from
-  receiving traffic (see PROJECT.md §15).
+- /readyz answers 200 only when dependencies are usable (today: Postgres answers
+  SELECT 1), otherwise 503. A failing /readyz keeps a broken revision from
+  receiving traffic (PROJECT.md §15).
 """
 
 from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response, status
 from pydantic import BaseModel
 
 from aegisops_api import __version__
+from aegisops_api.db import ping
 
 router = APIRouter(tags=["health"])
 
@@ -32,8 +33,14 @@ async def healthz() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__)
 
 
-@router.get("/readyz", response_model=ReadyResponse)
-async def readyz() -> ReadyResponse:
-    checks = {"database": True}  # Day 2: real SELECT 1 against Postgres
-    status: Literal["ready", "degraded"] = "ready" if all(checks.values()) else "degraded"
-    return ReadyResponse(status=status, checks=checks)
+@router.get(
+    "/readyz",
+    response_model=ReadyResponse,
+    responses={status.HTTP_503_SERVICE_UNAVAILABLE: {"model": ReadyResponse}},
+)
+async def readyz(request: Request, response: Response) -> ReadyResponse:
+    checks = {"database": await ping(request.app.state.engine)}
+    ready = all(checks.values())
+    if not ready:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return ReadyResponse(status="ready" if ready else "degraded", checks=checks)

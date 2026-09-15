@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help install lint format typecheck test check api demo-up demo-down clean
+.PHONY: help install lint format typecheck test check api db-up db-down db-migrate db-revision demo-up demo-down clean
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -15,9 +15,9 @@ lint: ## Ruff lint + format check
 	uv run ruff check .
 	uv run ruff format --check .
 
-format: ## Auto-fix lint and formatting
-	uv run ruff check --fix .
+format: ## Auto-fix lint and formatting (format first so line-length fixes land before lint)
 	uv run ruff format .
+	uv run ruff check --fix .
 
 typecheck: ## mypy --strict on all source
 	uv run mypy apps/api/src packages/*/src
@@ -29,6 +29,18 @@ check: lint typecheck test ## Everything CI runs
 
 api: ## Run the API locally with reload
 	uv run uvicorn aegisops_api.main:app --app-dir apps/api/src --reload --port 8000
+
+db-up: ## Start local Postgres (pgvector) on port 5433
+	docker compose up -d --wait postgres
+
+db-down: ## Stop local Postgres (data kept in the aegis-pgdata volume)
+	docker compose stop postgres
+
+db-migrate: ## Apply all migrations (alembic upgrade head)
+	cd apps/api && uv run alembic upgrade head
+
+db-revision: ## Create a migration from model changes: make db-revision m="add foo"
+	cd apps/api && uv run alembic revision --autogenerate -m "$(m)"
 
 DEMO_DIR := ../opentelemetry-demo
 demo-up: ## Start the OTel Demo (minimal) with our overrides
