@@ -6,6 +6,7 @@ Request handlers get a session from `get_session`; tests get one from a fixture.
 
 from collections.abc import AsyncIterator
 
+from fastapi import Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -52,3 +53,9 @@ async def session_scope(
         except Exception:
             await session.rollback()
             raise
+
+
+async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
+    """FastAPI dependency: one committed-or-rolled-back session per request."""
+    async for session in session_scope(request.app.state.session_factory):
+        yield session

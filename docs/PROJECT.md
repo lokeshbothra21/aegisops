@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.5 |
+| Document version | 1.0.6 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -138,8 +138,8 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 ### E1 — Telemetry ingestion
 | ID | Feature | Pri | Phase/Week | Status |
 |---|---|---|---|---|
-| E1.1 | OTLP/HTTP receiver (`/ingest/v1/{traces,logs,metrics}`) with protobuf-JSON parsing | M | W1 | todo |
-| E1.2 | Postgres schema + Alembic migrations for spans/logs/metric_points | M | W1 | doing |
+| E1.1 | OTLP/HTTP receiver (`/ingest/v1/{traces,logs,metrics}`) with protobuf-JSON parsing | M | W1 | done (PR #4) |
+| E1.2 | Postgres schema + Alembic migrations for spans/logs/metric_points | M | W1 | done (PR #2) |
 | E1.3 | Collector override `otelcol-config-extras.yml` with otlphttp exporter + probabilistic sampler (keep all error spans); `compose.aegisops.yaml` override (grafana 400M) + Makefile wrapper | M | W1 | todo |
 | E1.4 | `service_edges` hourly derivation job | M | W2 | todo |
 | E1.5 | Retention job (24 h for non-scenario rows) | M | W2 | todo |
@@ -839,6 +839,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.3 | 14 Sep 2026 | Backlog: ERP as second target after freeze; added constraint that target-specific values live in `config/targets/`. |
 | 1.0.4 | 14 Sep 2026 | Python 3.12 → 3.13 (newest with prebuilt wheels for all deps; 3.14 too fresh). W1 D1 scaffold started on `feat/E11.1-repo-scaffold`. |
 | 1.0.5 | 15 Sep 2026 | W1 D2: Postgres 16 → 17 (matches new Supabase projects). Local container on host port 5433 to avoid the ERP's Homebrew Postgres on 5432. First migration `0001_telemetry_tables`. E1.2 doing. |
+| 1.0.6 | 16 Sep 2026 | W1 D3: E1.1 OTLP/HTTP receiver. **OTLP/JSON only** (collector `otlphttp` exporter needs `encoding: json`; binary protobuf answers 415) — avoids the protobuf dependency and the base64-vs-hex id mismatch. gzip bodies accepted; body cap `AEGIS_INGEST_MAX_BODY_BYTES` (16 MiB). Metrics: one row per data point; histogram/summary keep `count` in `value` and buckets/quantiles under `attrs["otel.histogram"]` etc. Signal attributes flat in `attrs`, resource/scope/events/links under `otel.*` keys. All API errors now RFC 7807 problem+json. Measured ~20k spans/s in-process (NFR-04 needs 500). `docs/RUNBOOK.md` started. |
 
 ---
 
