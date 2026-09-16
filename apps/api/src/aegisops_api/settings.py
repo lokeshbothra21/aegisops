@@ -23,6 +23,12 @@ class Settings(BaseSettings):
         description="SQLAlchemy async URL.",
     )
 
+    ingest_max_body_bytes: int = Field(
+        default=16 * 1024 * 1024,
+        ge=1024,
+        description="Reject OTLP payloads larger than this (raw and decompressed).",
+    )
+
 
 @lru_cache
 def get_settings() -> Settings:
