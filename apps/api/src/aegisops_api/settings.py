@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     log_json: bool = Field(default=False, description="Emit JSON logs (True in prod).")
 
     database_url: str = Field(
-        default="postgresql+asyncpg://aegis:aegis@localhost:5432/aegis",  # pragma: allowlist secret
+        default="postgresql+asyncpg://aegis:aegis@localhost:5433/aegis",  # pragma: allowlist secret
         description="SQLAlchemy async URL.",
     )
 

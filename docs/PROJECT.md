@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.4 |
+| Document version | 1.0.5 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -139,7 +139,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | ID | Feature | Pri | Phase/Week | Status |
 |---|---|---|---|---|
 | E1.1 | OTLP/HTTP receiver (`/ingest/v1/{traces,logs,metrics}`) with protobuf-JSON parsing | M | W1 | todo |
-| E1.2 | Postgres schema + Alembic migrations for spans/logs/metric_points | M | W1 | todo |
+| E1.2 | Postgres schema + Alembic migrations for spans/logs/metric_points | M | W1 | doing |
 | E1.3 | Collector override `otelcol-config-extras.yml` with otlphttp exporter + probabilistic sampler (keep all error spans); `compose.aegisops.yaml` override (grafana 400M) + Makefile wrapper | M | W1 | todo |
 | E1.4 | `service_edges` hourly derivation job | M | W2 | todo |
 | E1.5 | Retention job (24 h for non-scenario rows) | M | W2 | todo |
@@ -203,7 +203,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | E8.1 | Langfuse tracing per run, node spans, token/cost | M | W4 | todo |
 | E8.2 | OTel instrumentation of `aegisops-api` (FastAPI, SQLAlchemy, httpx) | M | W4 | todo |
 | E8.3 | Cost/latency per run in UI | M | W5 | todo |
-| E8.4 | Health endpoints `/healthz`, `/readyz`; uptime ping | M | W1 | todo |
+| E8.4 | Health endpoints `/healthz`, `/readyz`; uptime ping | M | W1 | doing (probes done PR #1; uptime ping W1 D7) |
 
 ### E9 — Security
 | ID | Feature | Pri | Week | Status |
@@ -227,7 +227,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 ### E11 — Platform and DevOps
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
-| E11.1 | Monorepo, `uv` workspace, `pnpm` web, Makefile, pre-commit | M | W1 | todo |
+| E11.1 | Monorepo, `uv` workspace, `pnpm` web, Makefile, pre-commit | M | W1 | done (py side, PR #1) |
 | E11.2 | CI workflow (lint, type, unit, integration w/ Postgres service, build) | M | W1 | todo |
 | E11.3 | CD: Cloud Run deploy on `main` via Workload Identity Federation | M | W1 | todo |
 | E11.4 | Vercel Git integration for web (preview per PR) | M | W1 | todo |
@@ -336,7 +336,7 @@ stateDiagram-v2
 | API | FastAPI | Async, SSE, Pydantic-native | Flask, Django |
 | Agent | LangGraph 1.x | Durable checkpoints, interrupts, streaming | CrewAI (no durable HITL), hand-rolled loop |
 | Tools | MCP (read-only) | Standard, on your resume, clean authz boundary | Direct functions only (kept for actions) |
-| DB | Postgres 16 + pgvector (Supabase) | One store for telemetry, state, vectors; free | ClickHouse (not free), Jaeger+Prom APIs (two stores, no replay) |
+| DB | Postgres 17 + pgvector (Supabase) | One store for telemetry, state, vectors; free | ClickHouse (not free), Jaeger+Prom APIs (two stores, no replay) |
 | LLM | Gemini Flash primary, Groq secondary | Free tiers; fast | Paid frontier models (small final run only) |
 | Tracing | Langfuse cloud + OpenTelemetry | Free; industry standard | LangSmith (limits) |
 | Frontend | Next.js + Tailwind + shadcn/ui | Vercel free; fast to build | Streamlit (looks like a demo) |
@@ -649,7 +649,7 @@ Rollback: `gcloud run services update-traffic aegisops-api --to-revisions=PREV=1
 
 | Env | API | DB | Web | LLM | Purpose |
 |---|---|---|---|---|---|
-| local | uvicorn / compose | Postgres 16 container | `pnpm dev` | Groq (dev), Gemini | Live + replay dev |
+| local | uvicorn / compose | Postgres 17 (pgvector image) container on host port **5433** (5432 is the ERP's Homebrew Postgres) | `pnpm dev` | Groq (dev), Gemini | Live + replay dev |
 | preview | — (points at prod API in read-only) | prod | Vercel preview per PR | — | UI review |
 | prod | Cloud Run `aegisops-api` (asia-south1), 1 vCPU, 1 GiB, timeout 900 s, concurrency 10, min 0, max 3 | Supabase free (pgvector, Supavisor pooler, IPv4 add-on if needed) | Vercel Hobby | Gemini free + small credits | Public replay demo |
 
@@ -838,6 +838,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.2 | 14 Sep 2026 | Grafana 13 thrashed at the demo's 175 MB limit (650% CPU, unresponsive). Fixed live with `docker update --memory 400m grafana`. **Persist in W1:** `infra/otel-demo/compose.aegisops.yaml` override sets grafana memory 400M and is passed with `-f` in our Makefile wrapper (E1.3 scope widened). |
 | 1.0.3 | 14 Sep 2026 | Backlog: ERP as second target after freeze; added constraint that target-specific values live in `config/targets/`. |
 | 1.0.4 | 14 Sep 2026 | Python 3.12 → 3.13 (newest with prebuilt wheels for all deps; 3.14 too fresh). W1 D1 scaffold started on `feat/E11.1-repo-scaffold`. |
+| 1.0.5 | 15 Sep 2026 | W1 D2: Postgres 16 → 17 (matches new Supabase projects). Local container on host port 5433 to avoid the ERP's Homebrew Postgres on 5432. First migration `0001_telemetry_tables`. E1.2 doing. |
 
 ---
 

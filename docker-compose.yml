@@ -1,0 +1,26 @@
+# Local infrastructure for AegisOps development. The API itself runs with `make api`.
+# Image matches Supabase's Postgres major version and ships the pgvector extension.
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: aegis-postgres
+    environment:
+      POSTGRES_USER: aegis
+      POSTGRES_PASSWORD: aegis  # local only; see .env.example  # pragma: allowlist secret
+      POSTGRES_DB: aegis
+    ports:
+      - "5433:5432"  # 5433 on the host: 5432 is taken by the Homebrew Postgres used by the ERP
+    volumes:
+      - aegis-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aegis -d aegis"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+volumes:
+  aegis-pgdata:
