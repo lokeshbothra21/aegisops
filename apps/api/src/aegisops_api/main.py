@@ -12,8 +12,9 @@ from fastapi import FastAPI
 
 from aegisops_api import __version__
 from aegisops_api.db import create_engine, create_session_factory
+from aegisops_api.errors import install_error_handlers
 from aegisops_api.logging import configure_logging
-from aegisops_api.routes import health
+from aegisops_api.routes import health, ingest
 from aegisops_api.settings import Settings, get_settings
 
 log = structlog.get_logger()
@@ -44,7 +45,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     app.state.settings = settings
+    install_error_handlers(app)
     app.include_router(health.router)
+    app.include_router(ingest.router)
     return app
 
 
