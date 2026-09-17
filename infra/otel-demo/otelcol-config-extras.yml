@@ -1,0 +1,78 @@
+# AegisOps layer for the OpenTelemetry Demo collector (E1.3).
+# Mounted over the demo's empty src/otel-collector/otelcol-config-extras.yml by
+# compose.aegisops.yaml, so it is always the LAST config the collector loads.
+#
+# Design:
+# - The demo's own pipelines (Jaeger, Prometheus, OpenSearch) are untouched: this
+#   file only ADDS `*/aegisops` pipelines that fan out from the same `otlp` receiver.
+# - Traces: tail sampling keeps every trace containing an ERROR span and 15% of
+#   the rest (NFR-04 talks about 10–20% of OK spans). Decisions are per trace, so
+#   an error trace arrives whole and the agent can walk parent -> child.
+# - Metrics: only what the alert rules (E2.3) read. The raw demo firehose is
+#   thousands of points every 10 s; unfiltered it would be tens of millions of
+#   rows a day on the laptop.
+# - Export: OTLP/HTTP **JSON** (the API does not speak binary protobuf), gzip,
+#   retried with backoff so a restart of the API loses nothing that fits in the queue.
+#
+# The collector merges config files but REPLACES arrays: nothing here touches the
+# demo's `service.pipelines.{traces,metrics,logs}` arrays on purpose.
+
+exporters:
+  otlphttp/aegisops:
+    # The API runs on the host (`make api`); `/v1/{traces,logs,metrics}` is appended.
+    endpoint: ${env:AEGISOPS_INGEST_ENDPOINT}
+    encoding: json
+    compression: gzip
+    timeout: 10s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 2s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      num_consumers: 2
+      queue_size: 2000
+      batch:
+        flush_timeout: 2s
+        min_size: 200
+        max_size: 1000
+
+processors:
+  tail_sampling/aegisops:
+    decision_wait: 5s
+    num_traces: 50000
+    expected_new_traces_per_sec: 200
+    policies:
+      - name: keep-error-traces
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: sample-the-rest
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 15
+
+  filter/aegisops_metrics:
+    error_mode: ignore
+    metrics:
+      metric:
+        # Drop everything that is NOT on the allowlist.
+        - 'not IsMatch(name, "^(traces\\.span\\.metrics\\.|container\\.(memory\\.usage\\.total|memory\\.percent|cpu\\.utilization|restarts)$|kafka\\.consumer_group\\.lag|http\\.server\\.(request\\.)?duration$|rpc\\.server\\.duration$|app\\.)")'
+
+service:
+  pipelines:
+    traces/aegisops:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter, transform/sanitize_spans, tail_sampling/aegisops]
+      exporters: [otlphttp/aegisops]
+    logs/aegisops:
+      receivers: [otlp]
+      processors: [resourcedetection, memory_limiter, transform/sanitize_logs]
+      exporters: [otlphttp/aegisops]
+    metrics/aegisops:
+      # span_metrics is the connector fed by the demo's UNSAMPLED traces pipeline,
+      # so request/error/latency metrics are computed on full traffic.
+      receivers: [otlp, span_metrics, docker_stats]
+      processors: [resourcedetection, memory_limiter, filter/aegisops_metrics]
+      exporters: [otlphttp/aegisops]
