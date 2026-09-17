@@ -10,7 +10,9 @@ Autonomous incident-response agent over real OpenTelemetry data.
 make install   # uv sync + git hooks
 make check     # lint, typecheck, tests (same as CI)
 make api       # http://localhost:8000/docs
-make demo-up   # start the pinned OpenTelemetry Demo (../opentelemetry-demo)
+make db-up     # local Postgres 17 on :5433
+make demo-up   # pinned OpenTelemetry Demo (../opentelemetry-demo) + our collector layer
+make flag name=paymentFailure variant=100%   # inject a fault; variant=off clears it
 ```
 
 ## License

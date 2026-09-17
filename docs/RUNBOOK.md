@@ -8,8 +8,11 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 |---|---|
 | `make test` fails with connection refused on 5433 | Docker (OrbStack) is not running or the container is down. `open -a OrbStack`, then `make db-up`. Data persists in the `aegis-pgdata` volume. |
 | `test_migrated_schema_matches_models` fails | Models and migrations drifted. `make db-revision m="describe change"`, inspect the generated file, `make db-migrate`. Never edit an applied migration. |
-| Demo (compose) won't start on 16 GB | Close apps, `make demo-up` (minimal profile), verify arm64 images, `docker system prune`. |
-| Grafana unresponsive / CPU pegged | Demo ships a 175 MB limit that Grafana 13 thrashes at. `make demo-up` applies `docker update --memory 400m grafana`; if started another way, run that by hand. |
+| Demo (compose) won't start on 16 GB | Close apps, `make demo-up` (minimal profile), verify arm64 images, `docker system prune`. Minimal mode measured ~2.5 GB (OpenSearch alone 1 GB). |
+| `make demo-up` fails at `demo-check` | The demo checkout, `infra/otel-demo/aegisops.env` pin and `infra/otel-demo/VERSION` disagree. `cd ../opentelemetry-demo && git checkout <VERSION>`, then fix the pin. Never run the demo's own `make start-*`: it skips our collector layer and overrides. |
+| Grafana unresponsive / CPU pegged | Demo ships a 175 MB limit that Grafana 13 thrashes at. `compose.aegisops.yaml` raises it to 400M; check with `docker stats grafana`. |
+| Need to inject a fault by hand | `make flag name=paymentFailure variant=100%` (flagd reloads within seconds; `variant=off` clears). Flags and variants: `../opentelemetry-demo/src/flagd/demo.flagd.json`. |
+| Collector log full of `kafkametrics ... lookup kafka: no such host` | Demo noise: minimal mode has no Kafka but the collector still loads the full config. Harmless; ignore unless running `compose.full.yaml`. |
 
 ## Ingest (collector → API)
 
@@ -20,7 +23,9 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | Collector logs `400 Invalid OTLP/JSON` | The `detail` field names the first bad path (e.g. `resourceSpans.0.scopeSpans: ...`). 4xx is not retried by the collector; fix the exporter config, data is lost for that batch only. |
 | Collector logs 5xx / connection refused and retries | API down or database unreachable; check `GET /readyz` (503 = DB). Collector retries with backoff, nothing is lost while its queue holds. From a container the API is `http://host.docker.internal:8000/ingest`. |
 | API log `ingest.traces rejected=N` | Spans without a valid 32-hex trace id / 16-hex span id are dropped and reported in the OTLP `partialSuccess` response. Check which SDK emits them. |
-| Rows arrive with `service = unknown_service` | Resource is missing `service.name`. Fix the SDK/collector `resource` processor; the row is kept so nothing is silently lost. |
+| Rows arrive with `service = unknown_service` | Resource is missing `service.name`. Expected for `docker_stats` metrics (use `attrs->'otel.resource'->>'container.name'`); for anything else fix the SDK/collector `resource` processor. The row is kept so nothing is silently lost. |
+| No rows although the demo is up | Is the API running on the host (`make api`)? `make demo-logs` shows the exporter's retries; `curl localhost:8000/readyz` must say ready. Collector reaches the host as `host.docker.internal` (set in `aegisops.env`). |
+| Too many / too few metric rows | The allowlist is the `filter/aegisops_metrics` OTTL statement in `otelcol-config-extras.yml`; sampling for traces is `tail_sampling/aegisops` (15% of non-error traces). |
 
 ## Deploy (Cloud Run) — from PROJECT.md §17, verify each when E11.3 lands
 

@@ -1,0 +1,19 @@
+# AegisOps overrides for the OpenTelemetry Demo, passed with `-f` after the demo's
+# own files by `make demo-up` (PROJECT.md changelog 1.0.2, E1.3).
+services:
+  otel-collector:
+    volumes:
+      # Same container path as the demo's stub -> this file wins (compose merges
+      # volumes by target). Host path is relative to the demo checkout.
+      - ../aegisops/infra/otel-demo/otelcol-config-extras.yml:/etc/otelcol-config-extras.yml
+    environment:
+      - AEGISOPS_INGEST_ENDPOINT
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # no-op on OrbStack/Docker Desktop, needed on Linux
+
+  grafana:
+    # Grafana 13 thrashes at the demo's 175M limit (650% CPU, unresponsive).
+    deploy:
+      resources:
+        limits:
+          memory: 400M
