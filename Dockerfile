@@ -31,5 +31,5 @@ COPY --chmod=755 infra/docker/entrypoint.sh /entrypoint.sh
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PORT=8080 AEGIS_ENV=prod AEGIS_LOG_JSON=true
 USER aegis
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=3s --start-period=10s CMD curl -fsS http://localhost:8080/healthz || exit 1
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s CMD curl -fsS http://localhost:8080/livez || exit 1
 ENTRYPOINT ["/entrypoint.sh"]

@@ -1,7 +1,8 @@
 """Liveness and readiness probes (E8.4).
 
-- /healthz answers as soon as the process is up. Cloud Run uses it to decide the
-  container is alive.
+- /livez answers as soon as the process is up (liveness). It is NOT /healthz on
+  purpose: Google Frontend reserves that exact path on *.run.app domains and answers
+  it with its own 404 before the request reaches the container (found 18 Sep 2026).
 - /readyz answers 200 only when dependencies are usable (today: Postgres answers
   SELECT 1), otherwise 503. A failing /readyz keeps a broken revision from
   receiving traffic (PROJECT.md §15).
@@ -28,8 +29,8 @@ class ReadyResponse(BaseModel):
     checks: dict[str, bool]
 
 
-@router.get("/healthz", response_model=HealthResponse)
-async def healthz() -> HealthResponse:
+@router.get("/livez", response_model=HealthResponse)
+async def livez() -> HealthResponse:
     return HealthResponse(status="ok", version=__version__)
 
 

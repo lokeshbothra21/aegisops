@@ -203,7 +203,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | E8.1 | Langfuse tracing per run, node spans, token/cost | M | W4 | todo |
 | E8.2 | OTel instrumentation of `aegisops-api` (FastAPI, SQLAlchemy, httpx) | M | W4 | todo |
 | E8.3 | Cost/latency per run in UI | M | W5 | todo |
-| E8.4 | Health endpoints `/healthz`, `/readyz`; uptime ping | M | W1 | doing (probes done PR #1; uptime ping W1 D7) |
+| E8.4 | Health endpoints `/livez`, `/readyz`; uptime ping | M | W1 | doing (probes done PR #1; uptime ping W1 D7) |
 
 ### E9 — Security
 | ID | Feature | Pri | Week | Status |
@@ -380,7 +380,7 @@ Base: `/api/v1`. Auth: none for GET; `X-Admin-Token` for mutating routes marked 
 | Method | Path | Purpose |
 |---|---|---|
 | POST | `/ingest/v1/traces` · `/logs` · `/metrics` | OTLP/HTTP JSON receivers (collector → API) |
-| GET | `/healthz` · `/readyz` | Liveness / readiness (DB ping) |
+| GET | `/livez` · `/readyz` | Liveness / readiness (DB ping) |
 | GET | `/incidents?status=&limit=&cursor=` | List |
 | GET | `/incidents/{id}` | Detail incl. latest run, remediation, postmortem |
 | POST | `/incidents/{id}/runs` | Start (or restart) an investigation; body `{model?, variant?}` |
@@ -555,7 +555,7 @@ A single-shot LLM (alert + 200 error logs + metrics in one prompt) · B agent wi
 | Agent traces | Langfuse cloud | Run = trace; node = span; tokens, cost, prompt version, model |
 | App traces/metrics | OpenTelemetry SDK → same Postgres (dogfooding) + optional Grafana Cloud free | HTTP latency, DB timings, SSE durations |
 | Logs | structlog JSON → Cloud Logging | Correlated by run_id |
-| Uptime | GitHub Actions cron → `/healthz` every 3 days (doubles as Supabase keep-alive) | Fails the workflow on non-200 |
+| Uptime | GitHub Actions cron → `/livez` every 3 days (doubles as Supabase keep-alive) | Fails the workflow on non-200 |
 | Product metrics | `bench_results`, `runs` | Cost/run, p50 TTD, fallback rate, budget-exceeded rate shown on Benchmark page |
 
 ---
@@ -631,11 +631,11 @@ flowchart LR
   PR -- Vercel preview --> PV[Preview URL]
   MERGE[Merge to main] --> SMOKE["eval-smoke.yml: 3 replay scenarios (real LLM)"]
   SMOKE --> DEPLOY["deploy-api.yml: build → Artifact Registry → Cloud Run (tagged revision, no traffic)"]
-  DEPLOY --> HC[healthz + readyz on tagged URL]
+  DEPLOY --> HC[livez + readyz on tagged URL]
   HC -- ok --> TRAFFIC[shift 100% traffic]
   HC -- fail --> KEEP[keep previous revision, open issue]
   MERGE -- Vercel --> WEBPROD[web prod]
-  CRON["keepalive.yml (every 3 days)"] --> PING[/healthz + SELECT 1/]
+  CRON["keepalive.yml (every 3 days)"] --> PING[/livez + SELECT 1/]
   NIGHT["nightly.yml"] --> SMOKE
 ```
 
@@ -841,7 +841,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.5 | 15 Sep 2026 | W1 D2: Postgres 16 → 17 (matches new Supabase projects). Local container on host port 5433 to avoid the ERP's Homebrew Postgres on 5432. First migration `0001_telemetry_tables`. E1.2 doing. |
 | 1.0.6 | 16 Sep 2026 | W1 D3: E1.1 OTLP/HTTP receiver. **OTLP/JSON only** (collector `otlphttp` exporter needs `encoding: json`; binary protobuf answers 415) — avoids the protobuf dependency and the base64-vs-hex id mismatch. gzip bodies accepted; body cap `AEGIS_INGEST_MAX_BODY_BYTES` (16 MiB). Metrics: one row per data point; histogram/summary keep `count` in `value` and buckets/quantiles under `attrs["otel.histogram"]` etc. Signal attributes flat in `attrs`, resource/scope/events/links under `otel.*` keys. All API errors now RFC 7807 problem+json. Measured ~20k spans/s in-process (NFR-04 needs 500). `docs/RUNBOOK.md` started. |
 | 1.0.7 | 17 Sep 2026 | W1 D4: E1.3 collector layer. Our `infra/otel-demo/otelcol-config-extras.yml` is mounted over the demo's stub by `compose.aegisops.yaml`; it ADDS `*/aegisops` pipelines and leaves the demo's Jaeger/Prometheus/OpenSearch pipelines untouched. Traces: **tail sampling** (keep every trace with an ERROR span, 15% of the rest) instead of a plain probabilistic sampler, so error traces arrive whole (measured 77 spans/trace). Metrics: OTTL allowlist (span_metrics, container memory/CPU, kafka lag, http/rpc server duration, `app.*`) — unfiltered the demo is tens of millions of rows/day. Version pin moved into `infra/otel-demo/aegisops.env` (third `--env-file`); `make demo-check` guards checkout = pin = VERSION. `make flag name= variant=` edits `demo.flagd.json`. **Week 1 exit criterion met:** `paymentFailure=100%` → first ERROR spans in Postgres 6 s after the toggle; 15 services, 0 rejected rows; `exception.message` captured under `attrs.otel.events`. Notes for E2.3: docker_stats rows have `service=unknown_service` — the container name is `attrs.otel.resource.container.name`; span_metrics carry `status.code` as `STATUS_CODE_ERROR` strings. Kafka receiver errors in the collector log are demo noise in minimal mode (no Kafka). |
-| 1.0.8 | 18 Sep 2026 | W1 D5: E11.2 `ci.yml` — three jobs (lint+typecheck, tests against a `pgvector/pgvector:pg17` service container with `make db-migrate` first, pre-commit hooks), `UV_FROZEN=1`, actions pinned by SHA, concurrency cancels superseded runs, coverage.xml uploaded as an artifact. The `docker build api` step from §15 waits for the Dockerfile (E11.3). E9.7: `codeql.yml` (python + actions, security-extended, weekly Monday run), `dependency-review.yml` (fail on high severity, deny copyleft licences); repo settings enabled via API: Dependabot alerts, Dependabot security updates (secret scanning + push protection were already on for the public repo). E11.6: `dependabot.yml` — uv, github-actions and docker ecosystems, weekly on Tuesday 06:00 IST, minor+patch grouped, majors grouped separately, `chore(deps)` / `chore(ci)` prefixes, `dependencies` label created. E11.3: GCP project **`aegisops-508519`** (asia-south1; the second `gen-lang-client-…` project named aegisops is an AI Studio artefact, unbilled, ignore). Set up by CLI: APIs, Artifact Registry `aegisops` (cleanup: keep 5, delete >30 d), runtime SA `aegisops-api` (secretAccessor), deployer SA `github-deployer` (run.admin, artifactregistry.writer, actAs runtime), WIF pool `github` / provider `aegisops-repo` restricted to `assertion.repository == 'lokeshbothra21/aegisops'`, budget alert ₹500 (50 %, 100 %, forecast). `Dockerfile` multi-stage uv → python:3.13-slim, non-root, 76 MB; entrypoint runs `alembic upgrade head` only when `AEGIS_DATABASE_URL` is set. `deploy-api.yml`: make check → build/push → deploy `--no-traffic` tagged `sha-<short>` → probe `/healthz` on the tag → `--to-latest`. `/readyz` is reported, not gated, until Supabase (E11.5). Repo variables hold the non-secret GCP ids. gcloud config `aegisops` (account lokesh8946891910) keeps this separate from the ERP project's default config. |
+| 1.0.8 | 18 Sep 2026 | W1 D5: E11.2 `ci.yml` — three jobs (lint+typecheck, tests against a `pgvector/pgvector:pg17` service container with `make db-migrate` first, pre-commit hooks), `UV_FROZEN=1`, actions pinned by SHA, concurrency cancels superseded runs, coverage.xml uploaded as an artifact. The `docker build api` step from §15 waits for the Dockerfile (E11.3). E9.7: `codeql.yml` (python + actions, security-extended, weekly Monday run), `dependency-review.yml` (fail on high severity, deny copyleft licences); repo settings enabled via API: Dependabot alerts, Dependabot security updates (secret scanning + push protection were already on for the public repo). E11.6: `dependabot.yml` — uv, github-actions and docker ecosystems, weekly on Tuesday 06:00 IST, minor+patch grouped, majors grouped separately, `chore(deps)` / `chore(ci)` prefixes, `dependencies` label created. E11.3: GCP project **`aegisops-508519`** (asia-south1; the second `gen-lang-client-…` project named aegisops is an AI Studio artefact, unbilled, ignore). Set up by CLI: APIs, Artifact Registry `aegisops` (cleanup: keep 5, delete >30 d), runtime SA `aegisops-api` (secretAccessor), deployer SA `github-deployer` (run.admin, artifactregistry.writer, actAs runtime), WIF pool `github` / provider `aegisops-repo` restricted to `assertion.repository == 'lokeshbothra21/aegisops'`, budget alert ₹500 (50 %, 100 %, forecast). `Dockerfile` multi-stage uv → python:3.13-slim, non-root, 76 MB; entrypoint runs `alembic upgrade head` only when `AEGIS_DATABASE_URL` is set. `deploy-api.yml`: make check → build/push → deploy `--no-traffic` tagged `sha-<short>` → probe `/livez` on the tag → `--to-latest`. `/readyz` is reported, not gated, until Supabase (E11.5). Repo variables hold the non-secret GCP ids. gcloud config `aegisops` (account lokesh8946891910) keeps this separate from the ERP project's default config. **First deploys taught two things:** `--no-traffic` is rejected when the service does not exist yet (workflow now drops it on the first deploy only), and **Google Frontend reserves `/healthz` on `*.run.app`** and answers it with its own HTML 404 before the container sees the request (`/readyz` reached the app fine). Liveness endpoint renamed **`/livez`** everywhere (§7, E8.4, §15, §17). Service URL: https://aegisops-api-875836872466.asia-south1.run.app |
 
 ---
 
