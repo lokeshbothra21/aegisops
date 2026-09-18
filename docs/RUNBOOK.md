@@ -27,12 +27,17 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | No rows although the demo is up | Is the API running on the host (`make api`)? `make demo-logs` shows the exporter's retries; `curl localhost:8000/readyz` must say ready. Collector reaches the host as `host.docker.internal` (set in `aegisops.env`). |
 | Too many / too few metric rows | The allowlist is the `filter/aegisops_metrics` OTTL statement in `otelcol-config-extras.yml`; sampling for traces is `tail_sampling/aegisops` (15% of non-error traces). |
 
-## Deploy (Cloud Run) — from PROJECT.md §17, verify each when E11.3 lands
+## Deploy (Cloud Run, project `aegisops-508519`, region asia-south1)
+
+Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh8946891910); the default config belongs to the ERP project.
 
 | Situation | Action |
 |---|---|
-| Deploy failed health check | Traffic stayed on the previous revision; read Cloud Run logs; fix; redeploy. |
-| Need manual rollback | `gcloud run services update-traffic aegisops-api --to-revisions=<prev>=100` |
+| `deploy-api` failed at "Probe the tagged revision" | Traffic stayed on the previous revision. Open the tagged URL from the job log, then `gcloud run services logs read aegisops-api --region asia-south1 --limit 50`. Fix, merge, redeploy. |
+| Need manual rollback | `gcloud run revisions list --service aegisops-api --region asia-south1`, then `gcloud run services update-traffic aegisops-api --region asia-south1 --to-revisions=<prev>=100`. |
+| Deploy failed at `auth` (WIF) | The provider only trusts `lokeshbothra21/aegisops`. A fork or renamed repo cannot deploy. Check the repo variables `GCP_WIF_PROVIDER` / `GCP_DEPLOY_SA`. |
+| Unexpected GCP bill | Budget alert "aegisops guardrail" (₹500) emails at 50 %, 100 % and forecast. Check `--min-instances` is 0 and Artifact Registry cleanup kept ≤ 5 images. |
+| Redeploy without a code change | Actions → deploy-api → Run workflow (`workflow_dispatch`). |
 | Supabase paused | Keep-alive cron (E11.5) should prevent it; else restore from the dashboard and verify `/readyz`. |
 | Schema change needed | New Alembic migration; CI runs it against a fresh DB; deploy runs `alembic upgrade head` as a pre-start step. |
 | Key leaked | Rotate in the provider, update Secret Manager, redeploy, add a note to `SECURITY.md`. |
