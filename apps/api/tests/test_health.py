@@ -4,8 +4,8 @@ from aegisops_api.main import create_app
 from aegisops_api.settings import Settings
 
 
-async def test_healthz_reports_ok_and_version(client: AsyncClient) -> None:
-    r = await client.get("/healthz")
+async def test_livez_reports_ok_and_version(client: AsyncClient) -> None:
+    r = await client.get("/livez")
     assert r.status_code == 200
     body = r.json()
     assert body["status"] == "ok"

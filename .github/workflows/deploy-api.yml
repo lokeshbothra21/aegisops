@@ -129,10 +129,10 @@ jobs:
           echo "tag_url=$TAG_URL" >> "$GITHUB_OUTPUT"
           echo "probing $TAG_URL"
           for i in $(seq 1 12); do
-            if curl -fsS --max-time 10 "$TAG_URL/healthz"; then echo; ok=1; break; fi
+            if curl -fsS --max-time 10 "$TAG_URL/livez"; then echo; ok=1; break; fi
             sleep 5
           done
-          [ "${ok:-0}" = 1 ] || { echo "::error::/healthz never answered on $TAG_URL"; exit 1; }
+          [ "${ok:-0}" = 1 ] || { echo "::error::/livez never answered on $TAG_URL"; exit 1; }
           # /readyz is reported, not gated, until Supabase (E11.5) gives prod a database.
           code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$TAG_URL/readyz" || true)
           echo "readyz=$code" >> "$GITHUB_OUTPUT"

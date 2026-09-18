@@ -104,8 +104,8 @@ jobs:
           tags: aegisops-api:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
-      - name: Container starts and answers /healthz without a database
+      - name: Container starts and answers /livez without a database
         run: |
           docker run -d --rm --name api -p 8080:8080 aegisops-api:ci
-          for i in $(seq 1 10); do curl -fsS localhost:8080/healthz && exit 0; sleep 1; done
+          for i in $(seq 1 10); do curl -fsS localhost:8080/livez && exit 0; sleep 1; done
           docker logs api; exit 1
