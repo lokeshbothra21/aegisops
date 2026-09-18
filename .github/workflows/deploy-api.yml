@@ -1,0 +1,148 @@
+# Deploy the API to Cloud Run on every push to main (PROJECT.md §15/§16, E11.3).
+# Keyless: GitHub's OIDC token is exchanged for the deployer service account via
+# Workload Identity Federation (ADR-012). No JSON keys anywhere.
+#
+# Flow: build → push to Artifact Registry → deploy a NEW revision with no traffic,
+# tagged with the short SHA → probe the tagged URL → only then shift 100% traffic.
+# A broken revision never receives traffic and the previous one keeps serving.
+name: deploy-api
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["docs/**", "**.md", "infra/otel-demo/**", ".github/dependabot.yml"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false # never cancel a half-finished deploy
+
+env:
+  SERVICE: aegisops-api
+  IMAGE: ${{ vars.GCP_REGION }}-docker.pkg.dev/${{ vars.GCP_PROJECT_ID }}/aegisops/api
+
+jobs:
+  # Same gate as ci.yml so a red main never deploys (the push event runs both in parallel).
+  check:
+    name: make check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: aegis
+          POSTGRES_PASSWORD: aegis # pragma: allowlist secret
+          POSTGRES_DB: aegis
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aegis -d aegis" --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      UV_FROZEN: "1"
+      AEGIS_ENV: test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - run: uv sync --all-packages
+      - run: make db-migrate
+      - run: make check
+
+  deploy:
+    name: build, push, deploy (no traffic), probe, shift traffic
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # OIDC token for WIF
+    outputs:
+      url: ${{ steps.url.outputs.url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - id: auth
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3
+        with:
+          workload_identity_provider: ${{ vars.GCP_WIF_PROVIDER }}
+          service_account: ${{ vars.GCP_DEPLOY_SA }}
+          token_format: access_token
+
+      - uses: google-github-actions/setup-gcloud@aa5489c8933f4cc7a4f7d45035b3b1440c9c10db # v3.0.1
+        with:
+          project_id: ${{ vars.GCP_PROJECT_ID }}
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ vars.GCP_REGION }}-docker.pkg.dev
+          username: oauth2accesstoken
+          password: ${{ steps.auth.outputs.access_token }}
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - id: meta
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          push: true
+          provenance: false
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Deploy new revision with no traffic
+        run: |
+          gcloud run deploy "$SERVICE" \
+            --region "${{ vars.GCP_REGION }}" \
+            --image "$IMAGE:${{ github.sha }}" \
+            --service-account "${{ vars.GCP_RUNTIME_SA }}" \
+            --platform managed --allow-unauthenticated --port 8080 \
+            --cpu 1 --memory 1Gi --timeout 900 --concurrency 10 \
+            --min-instances 0 --max-instances 3 --cpu-boost --session-affinity \
+            --set-env-vars "AEGIS_ENV=prod,AEGIS_LOG_JSON=true,AEGIS_LOG_LEVEL=INFO" \
+            --labels "commit=${{ steps.meta.outputs.short }},managed-by=github-actions" \
+            --tag "sha-${{ steps.meta.outputs.short }}" \
+            --no-traffic --quiet
+
+      - name: Probe the tagged revision before it gets traffic
+        id: probe
+        run: |
+          TAG_URL=$(gcloud run services describe "$SERVICE" --region "${{ vars.GCP_REGION }}" \
+            --format="value(status.traffic.filter(tag:'sha-${{ steps.meta.outputs.short }}').extract(url).flatten())")
+          echo "tag_url=$TAG_URL" >> "$GITHUB_OUTPUT"
+          echo "probing $TAG_URL"
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 10 "$TAG_URL/healthz"; then echo; ok=1; break; fi
+            sleep 5
+          done
+          [ "${ok:-0}" = 1 ] || { echo "::error::/healthz never answered on $TAG_URL"; exit 1; }
+          # /readyz is reported, not gated, until Supabase (E11.5) gives prod a database.
+          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$TAG_URL/readyz" || true)
+          echo "readyz=$code" >> "$GITHUB_OUTPUT"
+          echo "/readyz -> $code"
+
+      - name: Shift 100% traffic to the new revision
+        run: gcloud run services update-traffic "$SERVICE" --region "${{ vars.GCP_REGION }}" --to-latest --quiet
+
+      - id: url
+        run: echo "url=$(gcloud run services describe "$SERVICE" --region "${{ vars.GCP_REGION }}" --format='value(status.url)')" >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deployed \`$SERVICE\` @ \`${{ steps.meta.outputs.short }}\`"
+            echo "- URL: ${{ steps.url.outputs.url }}"
+            echo "- Revision tag: ${{ steps.probe.outputs.tag_url }}"
+            echo "- /readyz on the new revision: ${{ steps.probe.outputs.readyz }} (503 is expected until E11.5)"
+            echo "- Rollback: \`gcloud run services update-traffic $SERVICE --region ${{ vars.GCP_REGION }} --to-revisions=<prev>=100\`"
+          } >> "$GITHUB_STEP_SUMMARY"

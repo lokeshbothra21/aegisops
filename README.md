@@ -15,6 +15,10 @@ make demo-up   # pinned OpenTelemetry Demo (../opentelemetry-demo) + our collect
 make flag name=paymentFailure variant=100%   # inject a fault; variant=off clears it
 ```
 
+## Deploy
+
+Every push to `main` builds the image, deploys a no-traffic Cloud Run revision, probes it, then shifts traffic (`.github/workflows/deploy-api.yml`). Keyless via Workload Identity Federation. Runbook: [`docs/RUNBOOK.md`](docs/RUNBOOK.md).
+
 ## License
 
 Apache-2.0
