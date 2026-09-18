@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.7 |
+| Document version | 1.0.8 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -228,7 +228,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
 | E11.1 | Monorepo, `uv` workspace, `pnpm` web, Makefile, pre-commit | M | W1 | done (py side, PR #1) |
-| E11.2 | CI workflow (lint, type, unit, integration w/ Postgres service, build) | M | W1 | todo |
+| E11.2 | CI workflow (lint, type, unit, integration w/ Postgres service, build) | M | W1 | done (PR #6; docker build step lands with the Dockerfile in E11.3) |
 | E11.3 | CD: Cloud Run deploy on `main` via Workload Identity Federation | M | W1 | todo |
 | E11.4 | Vercel Git integration for web (preview per PR) | M | W1 | todo |
 | E11.5 | Supabase keep-alive cron (free tier pauses after 7 days idle) | M | W1 | todo |
@@ -841,6 +841,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.5 | 15 Sep 2026 | W1 D2: Postgres 16 → 17 (matches new Supabase projects). Local container on host port 5433 to avoid the ERP's Homebrew Postgres on 5432. First migration `0001_telemetry_tables`. E1.2 doing. |
 | 1.0.6 | 16 Sep 2026 | W1 D3: E1.1 OTLP/HTTP receiver. **OTLP/JSON only** (collector `otlphttp` exporter needs `encoding: json`; binary protobuf answers 415) — avoids the protobuf dependency and the base64-vs-hex id mismatch. gzip bodies accepted; body cap `AEGIS_INGEST_MAX_BODY_BYTES` (16 MiB). Metrics: one row per data point; histogram/summary keep `count` in `value` and buckets/quantiles under `attrs["otel.histogram"]` etc. Signal attributes flat in `attrs`, resource/scope/events/links under `otel.*` keys. All API errors now RFC 7807 problem+json. Measured ~20k spans/s in-process (NFR-04 needs 500). `docs/RUNBOOK.md` started. |
 | 1.0.7 | 17 Sep 2026 | W1 D4: E1.3 collector layer. Our `infra/otel-demo/otelcol-config-extras.yml` is mounted over the demo's stub by `compose.aegisops.yaml`; it ADDS `*/aegisops` pipelines and leaves the demo's Jaeger/Prometheus/OpenSearch pipelines untouched. Traces: **tail sampling** (keep every trace with an ERROR span, 15% of the rest) instead of a plain probabilistic sampler, so error traces arrive whole (measured 77 spans/trace). Metrics: OTTL allowlist (span_metrics, container memory/CPU, kafka lag, http/rpc server duration, `app.*`) — unfiltered the demo is tens of millions of rows/day. Version pin moved into `infra/otel-demo/aegisops.env` (third `--env-file`); `make demo-check` guards checkout = pin = VERSION. `make flag name= variant=` edits `demo.flagd.json`. **Week 1 exit criterion met:** `paymentFailure=100%` → first ERROR spans in Postgres 6 s after the toggle; 15 services, 0 rejected rows; `exception.message` captured under `attrs.otel.events`. Notes for E2.3: docker_stats rows have `service=unknown_service` — the container name is `attrs.otel.resource.container.name`; span_metrics carry `status.code` as `STATUS_CODE_ERROR` strings. Kafka receiver errors in the collector log are demo noise in minimal mode (no Kafka). |
+| 1.0.8 | 18 Sep 2026 | W1 D5: E11.2 `ci.yml` — three jobs (lint+typecheck, tests against a `pgvector/pgvector:pg17` service container with `make db-migrate` first, pre-commit hooks), `UV_FROZEN=1`, actions pinned by SHA, concurrency cancels superseded runs, coverage.xml uploaded as an artifact. The `docker build api` step from §15 waits for the Dockerfile (E11.3). |
 
 ---
 
