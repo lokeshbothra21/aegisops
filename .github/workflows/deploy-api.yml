@@ -102,6 +102,13 @@ jobs:
 
       - name: Deploy new revision with no traffic
         run: |
+          # gcloud rejects --no-traffic when the service does not exist yet, so the
+          # very first deploy serves immediately; every later one is probed first.
+          if gcloud run services describe "$SERVICE" --region "${{ vars.GCP_REGION }}" >/dev/null 2>&1; then
+            TRAFFIC_FLAG=--no-traffic
+          else
+            TRAFFIC_FLAG=""; echo "::notice::first deploy of $SERVICE: creating the service with traffic"
+          fi
           gcloud run deploy "$SERVICE" \
             --region "${{ vars.GCP_REGION }}" \
             --image "$IMAGE:${{ github.sha }}" \
@@ -112,7 +119,7 @@ jobs:
             --set-env-vars "AEGIS_ENV=prod,AEGIS_LOG_JSON=true,AEGIS_LOG_LEVEL=INFO" \
             --labels "commit=${{ steps.meta.outputs.short }},managed-by=github-actions" \
             --tag "sha-${{ steps.meta.outputs.short }}" \
-            --no-traffic --quiet
+            $TRAFFIC_FLAG --quiet
 
       - name: Probe the tagged revision before it gets traffic
         id: probe
