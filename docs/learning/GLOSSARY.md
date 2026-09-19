@@ -130,3 +130,17 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | `SecretStr` | Pydantic type that masks secrets in logs | D6 |
 | Service dependency graph | Services as nodes, calls as edges, built from traces | D6 |
 | Service edge | (hour, caller, callee, call_count, err_count, p95_ms) | D6 |
+| Actor | Who made a change: `flagd-file`, later `agent`, `admin`, `policy:auto` | D7 |
+| Alert rule | `metric comparator threshold` over a window, for N consecutive windows; stored as data | D7 |
+| Async context manager | `async with` block whose exit code always runs; safer than a bare async generator | D7 |
+| Baseline snapshot | First read of a watched file records nothing; later diffs become events | D7 |
+| Change event | Record of a flag/deploy/restart/scale/commit with before/after JSON | D7 |
+| Enum storage (VARCHAR + CHECK) | `native_enum=False`; values evolve without a type migration | D7 |
+| Foreign key | DB-enforced reference (`incidents.alert_rule_id`) | D7 |
+| Incident | One service, one rule, a status, an autonomy level; runs attach to it | D7 |
+| Keyset / cursor pagination | `WHERE id < cursor LIMIT n+1`; stable and index-friendly | D7 |
+| mtime polling | Detect file changes by modification time on an interval | D7 |
+| Regression test | Pins a fixed bug so it cannot return | D7 |
+| State machine (explicit) | All legal transitions in one table; `transition()` is the only mutator | D7 |
+| Target config | `config/targets/*.yaml`: system-specific names kept out of code | D7 |
+| Terminal state | No exits; sets `closed_at` | D7 |

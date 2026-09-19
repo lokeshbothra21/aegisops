@@ -41,6 +41,16 @@ class Settings(BaseSettings):
         description="How often service_edges is refreshed (current + previous hour).",
     )
 
+    target_config_path: str = Field(
+        default="config/targets/otel-demo.yaml",
+        description="Target-system specifics (flags -> services). Relative to the repo root.",
+    )
+    flagd_config_path: str | None = Field(
+        default=None,
+        description="demo.flagd.json to watch for flag changes (E2.1). Unset = watcher off.",
+    )
+    flag_watch_interval_s: float = Field(default=2, ge=0.2, description="flagd file poll interval.")
+
     ingest_max_body_bytes: int = Field(
         default=16 * 1024 * 1024,
         ge=1024,

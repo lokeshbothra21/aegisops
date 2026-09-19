@@ -5,6 +5,7 @@ Request handlers get a session from `get_session`; tests get one from a fixture.
 """
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from fastapi import Request
 from sqlalchemy import text
@@ -42,10 +43,17 @@ async def ping(engine: AsyncEngine) -> bool:
         return False
 
 
+@asynccontextmanager
 async def session_scope(
     factory: async_sessionmaker[AsyncSession],
 ) -> AsyncIterator[AsyncSession]:
-    """Yield a session and commit on success, roll back on error."""
+    """`async with session_scope(factory) as s:` commits on success, rolls back on error.
+
+    A context manager, not a bare async generator: a caller that `return`s from
+    inside `async for` over a generator closes it at the `yield`, so the commit
+    after the yield never runs (found live on 19 Sep 2026: the job runner logged
+    results that were never persisted).
+    """
     async with factory() as session:
         try:
             yield session
@@ -57,5 +65,5 @@ async def session_scope(
 
 async def get_session(request: Request) -> AsyncIterator[AsyncSession]:
     """FastAPI dependency: one committed-or-rolled-back session per request."""
-    async for session in session_scope(request.app.state.session_factory):
+    async with session_scope(request.app.state.session_factory) as session:
         yield session

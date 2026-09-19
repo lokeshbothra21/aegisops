@@ -41,10 +41,11 @@ class JobRunner:
     async def run_once(self, job: Job) -> object | None:
         """Run one job in its own session; log and swallow errors. Returns the job's result."""
         try:
-            async for session in session_scope(self.factory):
+            async with session_scope(self.factory) as session:
                 result = await job.fn(session)
-                log.info("job.ok", job=job.name, result=result)
-                return result
+            # the commit has happened by here, so "job.ok" means "persisted"
+            log.info("job.ok", job=job.name, result=result)
+            return result
         except Exception as exc:
             log.warning("job.failed", job=job.name, error=repr(exc))
         return None

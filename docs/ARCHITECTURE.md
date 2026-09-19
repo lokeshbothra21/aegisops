@@ -44,7 +44,8 @@ flowchart LR
 | Database | Postgres 17 + pgvector | `pgvector/pgvector:pg17` locally on :5433; Supabase in prod | Single store for telemetry, derived tables, incidents/runs, LangGraph checkpoints, embeddings (ADR-003) | Built: telemetry tables; Supabase pending (E11.5) |
 | `agent` package | `packages/agent/` | LangGraph 1.x, Pydantic v2 | Graph, nodes, schemas, budgets, verifier, model router | Placeholder |
 | `tools` package | `packages/tools/` | MCP Python SDK | Read-only telemetry MCP server; actions module (not MCP, ADR-007) | Placeholder |
-| `alerts` package | `packages/alerts/` | APScheduler | Rule evaluation, incident opening | Placeholder |
+| Jobs + incidents (in the API for now) | `apps/api/.../jobs`, `.../incidents` | asyncio `JobRunner`, SQL | Retention, `service_edges` derivation, flagd change watcher; incident state machine | Built (E1.4, E1.5, E2.1, E2.4) |
+| `alerts` package | `packages/alerts/` | Python | Rule evaluation → incidents (E2.3) | Placeholder |
 | `web` | `apps/web/` (not created) | Next.js 15, TypeScript, Tailwind, shadcn/ui | Incidents list, incident detail with live SSE timeline, Benchmark, Failures | Planned (W5) |
 | `bench` | `bench/` | Python | Scenarios, runner, capture, metrics, report | Planned (W4+) |
 | Platform | `.github/workflows/`, `Dockerfile` | GitHub Actions, WIF, Artifact Registry, Cloud Run | CI (lint, types, tests vs Postgres, hooks, docker build), CodeQL, dependency review, Dependabot, keyless deploy with probe-before-traffic | Built (E11.2, E11.3, E11.6, E9.7) |
@@ -101,11 +102,13 @@ Built tables (migration `0001_telemetry_tables`):
 | `logs` | ts, service, severity_num, severity_text, body, trace_id, span_id, attrs jsonb, scenario_id | (service, ts), (scenario_id, service, severity_num), (trace_id) |
 | `metric_points` | ts, service, metric_name, value, unit, attrs jsonb, scenario_id | (service, metric_name, ts) |
 
-Every table has `id bigserial` and `created_at`. Planned tables: `service_edges`, `change_events`, `alert_rules`, `incidents`, `runs`, `run_events`, `evidence`, `remediations`, `postmortems` (vector(768), HNSW), `audit_log`, `scenarios`, `bench_results`, plus LangGraph's own checkpoint tables. See PROJECT.md §6.
+Also built: `service_edges` (0002: hourly caller→callee call_count / err_count / p95_ms), `change_events`, `alert_rules`, `incidents` (0003; enums as VARCHAR + CHECK; incidents FK → alert_rules).
+
+Every table has `id bigserial` and `created_at`. Planned tables: `runs`, `run_events`, `evidence`, `remediations`, `postmortems` (vector(768), HNSW), `audit_log`, `scenarios`, `bench_results`, plus LangGraph's own checkpoint tables. See PROJECT.md §6.
 
 ## 8. API surface
 
-Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`. All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
+Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `POST /api/v1/admin/{retention,service-edges}/run` (X-Admin-Token). All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
 
 ## 9. Deployment and operations
 
@@ -125,3 +128,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 | Date | Change |
 |---|---|
 | 18 Sep 2026 | Created from PROJECT.md §5–§6 with the built/planned split after Week 1 (ingest path, platform, Cloud Run). |
+| 19 Sep 2026 | Week 2 day 1: jobs (retention, service_edges, flag watcher), incident tables + lifecycle, incidents read API. |
