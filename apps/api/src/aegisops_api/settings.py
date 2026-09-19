@@ -7,7 +7,7 @@ Production values come from Cloud Run environment variables and Secret Manager.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -21,6 +21,24 @@ class Settings(BaseSettings):
     database_url: str = Field(
         default="postgresql+asyncpg://aegis:aegis@localhost:5433/aegis",  # pragma: allowlist secret
         description="SQLAlchemy async URL.",
+    )
+
+    admin_token: SecretStr | None = Field(
+        default=None,
+        description="X-Admin-Token for mutating routes (§7). Unset = admin routes answer 503.",
+    )
+
+    jobs_enabled: bool = Field(default=True, description="Run periodic jobs in this process.")
+    retention_hours: float = Field(
+        default=24, gt=0, description="Delete untagged rows older than this."
+    )
+    retention_interval_s: float = Field(
+        default=3600, ge=10, description="How often retention runs."
+    )
+    service_edges_interval_s: float = Field(
+        default=900,
+        ge=10,
+        description="How often service_edges is refreshed (current + previous hour).",
     )
 
     ingest_max_body_bytes: int = Field(
