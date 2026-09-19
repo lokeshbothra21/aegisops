@@ -55,3 +55,39 @@ async def test_run_once_returns_result_or_none(settings: Settings) -> None:
         assert await runner.run_once(Job("bad", bad, 1)) is None
     finally:
         await engine.dispose()
+
+
+async def test_run_once_commits_what_the_job_wrote(settings: Settings) -> None:
+    """Regression: an early `return` inside `async for` over the old session generator
+    skipped the commit, so ticks logged results that never reached the database."""
+    from datetime import UTC, datetime
+    from uuid import uuid4
+
+    from sqlalchemy import select
+
+    from aegisops_api.models import ChangeEvent, ChangeType
+
+    marker = uuid4().hex
+
+    async def write(s: AsyncSession) -> str:
+        s.add(
+            ChangeEvent(
+                ts=datetime.now(UTC), type=ChangeType.flag, service=None,
+                before={}, after={"flag": marker}, actor="test",
+            )
+        )  # fmt: skip
+        return marker
+
+    engine = create_engine(settings)
+    factory = create_session_factory(engine)
+    try:
+        assert await JobRunner(factory=factory).run_once(Job("write", write, 1)) == marker
+        async with factory() as fresh:
+            row = (
+                await fresh.scalars(
+                    select(ChangeEvent).where(ChangeEvent.after["flag"].astext == marker)
+                )
+            ).first()
+    finally:
+        await engine.dispose()
+    assert row is not None, "job result was logged but not committed"

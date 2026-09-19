@@ -1,0 +1,19 @@
+# OpenTelemetry Demo 3.0.0: feature flags and the service each one affects.
+# Read by aegisops_api.targets; the flag watcher uses it to fill change_events.service.
+name: otel-demo
+flags:
+  adFailure:                 {service: ad,              description: Ad service returns errors}
+  adHighCpu:                 {service: ad,              description: Ad service burns CPU}
+  adManualGc:                {service: ad,              description: Ad service forces GC pauses}
+  cartFailure:               {service: cart,            description: Cart service fails (datastore)}
+  emailMemoryLeak:           {service: email,           description: Email service leaks memory}
+  failedReadinessProbe:      {service: frontend,        description: Readiness probe fails}
+  imageSlowLoad:             {service: image-provider,  description: Images load slowly}
+  intlShippingSlowdown:      {service: shipping,        description: International shipping quotes slow}
+  kafkaQueueProblems:        {service: checkout,        description: Kafka consumer lag}
+  loadGeneratorTraffic:      {service: load-generator,  description: Traffic pattern}
+  loadGeneratorVUs:          {service: load-generator,  description: Virtual users (load spike, N1-N3)}
+  paymentFailure:            {service: payment,         description: Payment charges fail n%}
+  paymentUnreachable:        {service: payment,         description: Payment service unreachable}
+  productCatalogFailure:     {service: product-catalog, description: Product lookups fail}
+  recommendationCacheFailure: {service: recommendation, description: Recommendation cache leaks}

@@ -33,6 +33,12 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Why `pool_pre_ping`?** Hosted DBs drop idle connections; turn a stale connection into a reconnect, not a 500.
 - **How will you compute p95 from stored histograms?** Bucket counts + explicit bounds in `attrs.otel.histogram`; interpolate within the bucket that crosses the 95th percentile.
 
+## Incidents and change tracking
+- **How do you prevent duplicate incidents for one outage?** `active_incident(service)` returns the open one; the evaluator attaches rather than opens.
+- **Why is the incident lifecycle a table of allowed transitions?** Invalid states become unrepresentable; one mutator; trivially unit-tested.
+- **How do you know what changed before an alert without hooking every tool?** Watch the artefacts (flag file, container labels), diff snapshots, record before/after with an actor.
+- **Why cursor pagination?** Stable under inserts, O(log n), no COUNT.
+
 ## CI/CD and platform
 - **Walk me through a merge to main.** Day 5 flow paragraph.
 - **Why pin actions by SHA?** Tags are mutable; a compromised action could steal the OIDC token; Dependabot keeps pins fresh.
@@ -59,5 +65,6 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - ★ **How do you keep cost per incident bounded?** Budgets above, cheap model for triage, ≤ 4 KB tool outputs, cached-run fallback in public mode.
 
 ## Process
+- **Tell me about a bug your tests missed.** The job runner returned from inside `async for` over a session generator, closing it before the commit; ticks logged success but persisted nothing. Caught by verifying live from a second connection; fixed with `@asynccontextmanager` and a read-back regression test. (Day 7)
 - **How do you work?** Plan first (PROJECT.md), one feature per PR with its ID, squash merges, ADRs for decisions, learning log per day, runbook grows with each incident we hit ourselves.
 - **A mistake you made and fixed?** Stacked PR #3 closed by GitHub on base-branch deletion; rebased and re-opened as #4; rule recorded in ADR-011.

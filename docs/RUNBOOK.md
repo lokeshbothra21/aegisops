@@ -34,6 +34,8 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | Local DB growing / disk | Retention runs hourly in the API while it is up; force it: `curl -X POST -H "X-Admin-Token: $AEGIS_ADMIN_TOKEN" localhost:8000/api/v1/admin/retention/run`. Tagged (`scenario_id`) rows are never deleted. |
 | `service_edges` empty or stale | Refreshed every 15 min for the current + previous hour. Force: `POST /api/v1/admin/service-edges/run?hours=N` (N ≤ 48). Edges need parent→child spans across services; an INTERNAL-only trace produces none. |
 | Admin route answers 503 "Admin disabled" | `AEGIS_ADMIN_TOKEN` is unset on that deployment. Set it (Secret Manager in prod) and redeploy. 401 means the header is missing or wrong. |
+| Flag toggles not appearing in `change_events` | The watcher is on only when `AEGIS_FLAGD_CONFIG_PATH` points at the demo's `src/flagd/demo.flagd.json` (see `.env.example`); `jobs.start` must list `flag_watcher`. Changes made while the API was down are not back-filled. Unknown flags are recorded with `service = NULL`; add them to `config/targets/otel-demo.yaml`. |
+| A job logs `job.ok` but nothing is in the DB | Fixed 19 Sep (runner commit bug). If it recurs: the job must not `return` from inside a session block that is a bare async generator; use `async with session_scope(...)`. |
 | Job failing every tick (`job.failed` in logs) | The runner never stops on errors; read the `error=` field, fix, restart. Each tick is its own transaction, so a failure leaves no partial rows. |
 
 ## Deploy (Cloud Run, project `aegisops-508519`, region asia-south1)
