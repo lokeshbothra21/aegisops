@@ -17,3 +17,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [3](day-03-2026-09-16-ingest.md) | 16 Sep | OTLP/JSON ingest, RFC 7807, stacked-PR lesson | #4 |
 | [4](day-04-2026-09-17-collector.md) | 17 Sep | Collector layer, tail sampling, allowlist, first live fault | #5 |
 | [5](day-05-2026-09-18-platform.md) | 18 Sep | CI, CodeQL, Dependabot, Docker, WIF, Cloud Run | #6–#12 |
+| [6](day-06-2026-09-19-retention-service-edges.md) | 19 Sep | Retention, service edges, job runner, admin routes | #14 |

@@ -27,6 +27,15 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | No rows although the demo is up | Is the API running on the host (`make api`)? `make demo-logs` shows the exporter's retries; `curl localhost:8000/readyz` must say ready. Collector reaches the host as `host.docker.internal` (set in `aegisops.env`). |
 | Too many / too few metric rows | The allowlist is the `filter/aegisops_metrics` OTTL statement in `otelcol-config-extras.yml`; sampling for traces is `tail_sampling/aegisops` (15% of non-error traces). |
 
+## Data and jobs
+
+| Situation | Action |
+|---|---|
+| Local DB growing / disk | Retention runs hourly in the API while it is up; force it: `curl -X POST -H "X-Admin-Token: $AEGIS_ADMIN_TOKEN" localhost:8000/api/v1/admin/retention/run`. Tagged (`scenario_id`) rows are never deleted. |
+| `service_edges` empty or stale | Refreshed every 15 min for the current + previous hour. Force: `POST /api/v1/admin/service-edges/run?hours=N` (N ≤ 48). Edges need parent→child spans across services; an INTERNAL-only trace produces none. |
+| Admin route answers 503 "Admin disabled" | `AEGIS_ADMIN_TOKEN` is unset on that deployment. Set it (Secret Manager in prod) and redeploy. 401 means the header is missing or wrong. |
+| Job failing every tick (`job.failed` in logs) | The runner never stops on errors; read the `error=` field, fix, restart. Each tick is its own transaction, so a failure leaves no partial rows. |
+
 ## Deploy (Cloud Run, project `aegisops-508519`, region asia-south1)
 
 Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh8946891910); the default config belongs to the ERP project.

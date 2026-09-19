@@ -116,3 +116,17 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | uv / workspace | Fast Python project manager; multi-package repo with one lockfile | D1 |
 | Version pinning | Fixed demo tag 3.0.0 checked by `make demo-check` | D4 |
 | WIF | Workload Identity Federation: swap GitHub's OIDC token for Google credentials, keyless | D5 |
+| Admin token (`X-Admin-Token`) | Shared-secret header auth for mutating routes; unset → 503 (fail closed) | D6 |
+| CTE (`WITH ... AS`) | Named subquery inside a statement | D6 |
+| `date_trunc` window | Bucketing timestamps into fixed windows (hour, 5 min) | D6 |
+| Derived table | Aggregate computed by a job so hot queries are one indexed read (`service_edges`) | D6 |
+| Fail closed | Deny when a control is unconfigured | D6 |
+| Idempotent job | Re-running has no extra effect (delete-then-insert per window) | D6 |
+| `IS NOT DISTINCT FROM` | Null-safe SQL equality | D6 |
+| Job runner (asyncio) | Lifespan-managed periodic tasks; one session per tick; failures logged not fatal | D6 |
+| p95 / `percentile_cont` | 95th percentile latency; interpolating percentile in Postgres | D6 |
+| Retention policy | Delete untagged rows after 24 h; fixtures exempt | D6 |
+| `rowcount` / `CursorResult` | Rows affected by DML in SQLAlchemy 2 | D6 |
+| `SecretStr` | Pydantic type that masks secrets in logs | D6 |
+| Service dependency graph | Services as nodes, calls as edges, built from traces | D6 |
+| Service edge | (hour, caller, callee, call_count, err_count, p95_ms) | D6 |
