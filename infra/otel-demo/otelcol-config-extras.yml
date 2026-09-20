@@ -38,6 +38,12 @@ exporters:
         min_size: 200
         max_size: 1000
 
+connectors:
+  span_metrics:
+    # The demo leaves the default (60 s). Our alert evaluator reads these counters, so
+    # flush every 10 s: detection latency drops by up to 50 s. Prometheus does not mind.
+    metrics_flush_interval: 10s
+
 processors:
   tail_sampling/aegisops:
     decision_wait: 5s

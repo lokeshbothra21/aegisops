@@ -51,6 +51,17 @@ class Settings(BaseSettings):
     )
     flag_watch_interval_s: float = Field(default=2, ge=0.2, description="flagd file poll interval.")
 
+    alerts_enabled: bool = Field(default=True, description="Run the alert evaluator job.")
+    alerts_config_path: str = Field(
+        default="config/alerts.yaml", description="Default alert rules (seeded by name)."
+    )
+    alert_interval_s: float = Field(default=15, ge=5, description="Evaluator tick interval.")
+    alert_recovery_windows: int = Field(
+        default=3,
+        ge=1,
+        description="Healthy ticks before an un-investigated incident auto-resolves.",
+    )
+
     ingest_max_body_bytes: int = Field(
         default=16 * 1024 * 1024,
         ge=1024,

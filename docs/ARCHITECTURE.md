@@ -33,7 +33,7 @@ flowchart LR
   LLM["Gemini Flash / Groq"] <--> AGENT
 ```
 
-**Built:** the whole left-to-right path from the demo into Postgres (collector layer, ingest API, tables), the API skeleton with liveness/readiness, and the Cloud Run deployment of that API. **Planned:** agent, actions, UI, Langfuse, LLM.
+**Built:** the whole left-to-right path from the demo into Postgres (collector layer, ingest API, tables), derived service edges, change events from flag toggles, deterministic alerting that opens incidents, the API with liveness/readiness and a read-only incidents endpoint, and the Cloud Run deployment. **Planned:** agent, actions, UI, Langfuse, LLM.
 
 ## 3. Components
 
@@ -45,7 +45,7 @@ flowchart LR
 | `agent` package | `packages/agent/` | LangGraph 1.x, Pydantic v2 | Graph, nodes, schemas, budgets, verifier, model router | Placeholder |
 | `tools` package | `packages/tools/` | MCP Python SDK | Read-only telemetry MCP server; actions module (not MCP, ADR-007) | Placeholder |
 | Jobs + incidents (in the API for now) | `apps/api/.../jobs`, `.../incidents` | asyncio `JobRunner`, SQL | Retention, `service_edges` derivation, flagd change watcher; incident state machine | Built (E1.4, E1.5, E2.1, E2.4) |
-| `alerts` package | `packages/alerts/` | Python | Rule evaluation → incidents (E2.3) | Placeholder |
+| Alerts (in the API) | `apps/api/.../alerts` | SQL readers + `Evaluator` | Rules from `config/alerts.yaml` → `alert_rules`; every 30 s: error_rate / p95_ratio / memory / kafka lag per service → incidents via the state machine | Built (E2.3) |
 | `web` | `apps/web/` (not created) | Next.js 15, TypeScript, Tailwind, shadcn/ui | Incidents list, incident detail with live SSE timeline, Benchmark, Failures | Planned (W5) |
 | `bench` | `bench/` | Python | Scenarios, runner, capture, metrics, report | Planned (W4+) |
 | Platform | `.github/workflows/`, `Dockerfile` | GitHub Actions, WIF, Artifact Registry, Cloud Run | CI (lint, types, tests vs Postgres, hooks, docker build), CodeQL, dependency review, Dependabot, keyless deploy with probe-before-traffic | Built (E11.2, E11.3, E11.6, E9.7) |
@@ -129,3 +129,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 |---|---|
 | 18 Sep 2026 | Created from PROJECT.md §5–§6 with the built/planned split after Week 1 (ingest path, platform, Cloud Run). |
 | 19 Sep 2026 | Week 2 day 1: jobs (retention, service_edges, flag watcher), incident tables + lifecycle, incidents read API. |
+| 20 Sep 2026 | Week 2 day 2: alert evaluator (deterministic detection, ADR-008) opens incidents; 503 on DB outage. |

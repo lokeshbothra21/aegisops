@@ -144,3 +144,19 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | State machine (explicit) | All legal transitions in one table; `transition()` is the only mutator | D7 |
 | Target config | `config/targets/*.yaml`: system-specific names kept out of code | D7 |
 | Terminal state | No exits; sets `closed_at` | D7 |
+| Alerting rule / `for` duration | Expression over a window that must hold for N evaluations before firing | D8 |
+| Baseline | "Normal" for comparison; ours is the previous hour of the same metric | D8 |
+| Counter reset | Cumulative counter restarts at 0 after a process restart; window deltas undercount | D8 |
+| Cumulative vs delta | Ever-increasing total vs per-interval increment; window value = max − min of a cumulative | D8 |
+| Flapping | Alert oscillating between firing and resolved | D8 |
+| Hysteresis / recovery windows | Several healthy evaluations before resolving | D8 |
+| Minimum sample size | Below `MIN_CALLS` a rate is noise; no reading | D8 |
+| Percentile from buckets | Interpolate inside the bucket where cumulative count crosses q | D8 |
+| Rate vs ratio rule | Fraction of the window's traffic vs comparison to a baseline | D8 |
+| `Retry-After` | HTTP header: when to retry; sent with 503 on DB outage | D8 |
+| Streak state | Consecutive breaching/healthy ticks per (rule, service), kept in memory | D8 |
+| Test pollution | Shared rows left by one test changing another's behaviour; fix with unique names + cleanup | D8 |
+| Detection floor | Latency bound set by traffic rate × minimum sample size; not fixable by faster ticks | D8 |
+| Error burst rule | Absolute count of error server spans in a window; exact under tail sampling | D8 |
+| Cascade (alert) | Downstream services alerting because an upstream one fails; one incident per service, merged later by the agent | D8 |
+| `metrics_flush_interval` | How often the span-metrics connector emits counters (10 s in our layer) | D8 |
