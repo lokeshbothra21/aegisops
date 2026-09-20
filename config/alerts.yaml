@@ -1,0 +1,39 @@
+# Default alert rules (E2.3). Loaded at API start into the `alert_rules` table by name;
+# a rule that already exists in the table is NOT overwritten, so operators can tune
+# thresholds in the DB. Delete the row to get the default back.
+#
+# Semantics: every `AEGIS_ALERT_INTERVAL_S` (15 s) the evaluator computes `metric` over the last
+# `window_s` seconds for every service with data; when `value comparator threshold`
+# holds on `for_windows` consecutive evaluations, an incident opens for that service
+# (one open incident per service at a time). See docs/learning/day-08.
+rules:
+  - name: error-burst
+    metric: error_count           # ERROR server spans in the window (exact: all error traces are kept)
+    comparator: ">="
+    threshold: 5
+    window_s: 60
+    for_windows: 2
+  - name: high-error-rate
+    metric: error_rate            # server-span errors / calls, from span_metrics counters
+    comparator: ">"
+    threshold: 0.05               # 5 %
+    window_s: 120
+    for_windows: 2
+  - name: p95-latency-regression
+    metric: p95_ratio             # p95 now / p95 over the previous hour
+    comparator: ">"
+    threshold: 2.0
+    window_s: 300
+    for_windows: 2
+  - name: container-memory-high
+    metric: container_memory_pct  # docker_stats container.memory.percent
+    comparator: ">"
+    threshold: 90
+    window_s: 120
+    for_windows: 3
+  - name: kafka-consumer-lag
+    metric: kafka_lag             # kafka.consumer_group.lag, max over window (full demo mode only)
+    comparator: ">"
+    threshold: 1000
+    window_s: 120
+    for_windows: 2

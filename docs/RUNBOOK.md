@@ -38,6 +38,16 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | A job logs `job.ok` but nothing is in the DB | Fixed 19 Sep (runner commit bug). If it recurs: the job must not `return` from inside a session block that is a bare async generator; use `async with session_scope(...)`. |
 | Job failing every tick (`job.failed` in logs) | The runner never stops on errors; read the `error=` field, fix, restart. Each tick is its own transaction, so a failure leaves no partial rows. |
 
+## Alerting
+
+| Situation | Action |
+|---|---|
+| No incident opened although the fault is visible | Check `jobs.start` lists `alerts` and `alerts.rules_seeded` ran (`AEGIS_ALERTS_ENABLED`). Readers need span_metrics rows: `select count(*) from metric_points where metric_name='traces.span.metrics.calls' and ts > now()-interval '2 minutes'`. A service with < 5 calls in the window never fires a *rate* rule (the `error-burst` count rule still can). `for_windows` evaluations × 15 s must elapse after the first symptom; at the demo's default 5 VUs the payment path sees ~5 calls/min, which bounds detection to ~60 s after the first error. |
+| Too many incidents / flapping | Tune the rule row in `alert_rules` (threshold, `window_s`, `for_windows`); the seed never overwrites it. Delete the row to get the default from `config/alerts.yaml` back at next start. |
+| `alerts.unknown_metric` in logs | A rule row names a metric with no reader; fix or delete the row. Valid metrics: `error_count`, `error_rate`, `p95_ratio`, `container_memory_pct`, `kafka_lag`. |
+| Incident stuck `open` after recovery | Auto-resolve needs `AEGIS_ALERT_RECOVERY_WINDOWS` (3) healthy ticks **and** status `open`; anything investigated is the agent's/human's to close. |
+| API answers 503 "Database unavailable" | Postgres unreachable (connection refused / pool error). Local: `make db-up`. Prod: Supabase paused or secret wrong; `/readyz` shows the same. |
+
 ## Deploy (Cloud Run, project `aegisops-508519`, region asia-south1)
 
 Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh8946891910); the default config belongs to the ERP project.

@@ -33,6 +33,13 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Why `pool_pre_ping`?** Hosted DBs drop idle connections; turn a stale connection into a reconnect, not a 500.
 - **How will you compute p95 from stored histograms?** Bucket counts + explicit bounds in `attrs.otel.histogram`; interpolate within the bucket that crosses the 95th percentile.
 
+## Alerting
+- **Why not compute error rate from stored spans?** Tail-sampled (all errors, 15 % of OK) → biased; use span-metrics counters computed before sampling. (Day 8)
+- **How do you compute p95 from a histogram?** Bucket deltas over the window; find the bucket where the cumulative count crosses 95 %; interpolate.
+- **How do you avoid flapping?** `for` windows before firing, recovery windows before resolving, one active incident per service.
+- **Why a p95 ratio to a baseline rather than a fixed threshold?** Endpoints differ 100× in normal latency; a ratio catches regressions everywhere with one rule.
+- **Where does a 60 s detection budget go?** ~6 s sampling wait + ~10 s export interval + ≤30 s to the next tick, ×`for_windows`.
+
 ## Incidents and change tracking
 - **How do you prevent duplicate incidents for one outage?** `active_incident(service)` returns the open one; the evaluator attaches rather than opens.
 - **Why is the incident lifecycle a table of allowed transitions?** Invalid states become unrepresentable; one mutator; trivially unit-tested.

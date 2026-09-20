@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from sqlalchemy.exc import DBAPIError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
@@ -63,6 +64,19 @@ def install_error_handlers(app: FastAPI) -> None:
     async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         title = exc.detail if isinstance(exc.detail, str) else "HTTP error"
         return problem_response(request, exc.status_code, title, headers=exc.headers)
+
+    @app.exception_handler(OperationalError)
+    @app.exception_handler(DBAPIError)
+    @app.exception_handler(OSError)
+    async def _db_unavailable(request: Request, exc: Exception) -> JSONResponse:
+        # Connection refused / pool errors: the service is up but its dependency is not.
+        return problem_response(
+            request,
+            status.HTTP_503_SERVICE_UNAVAILABLE,
+            "Database unavailable",
+            type(exc).__name__,
+            headers={"Retry-After": "10"},
+        )
 
     @app.exception_handler(RequestValidationError)
     async def _validation(request: Request, exc: RequestValidationError) -> JSONResponse:

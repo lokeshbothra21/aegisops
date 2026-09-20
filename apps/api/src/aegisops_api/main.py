@@ -13,7 +13,8 @@ import structlog
 from fastapi import FastAPI
 
 from aegisops_api import __version__
-from aegisops_api.db import create_engine, create_session_factory
+from aegisops_api.alerts.evaluator import Evaluator, ensure_default_rules, load_rules_file
+from aegisops_api.db import create_engine, create_session_factory, session_scope
 from aegisops_api.errors import install_error_handlers
 from aegisops_api.jobs.flag_watcher import FlagWatcher
 from aegisops_api.jobs.retention import run_retention
@@ -35,6 +36,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     engine = create_engine(settings)
     app.state.engine = engine
     app.state.session_factory = create_session_factory(engine)
+    if settings.alerts_enabled:
+        await seed_rules(app)
     runner = build_job_runner(app)
     app.state.jobs = runner
     if settings.jobs_enabled:
@@ -46,6 +49,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         await runner.stop()
         await engine.dispose()
         log.info("api.stop")
+
+
+async def seed_rules(app: FastAPI) -> None:
+    """Insert missing default alert rules. Startup must not depend on the database
+    (Cloud Run boots before Supabase exists), so a failure here is a warning; the
+    evaluator will simply find no rules until the next restart."""
+    settings: Settings = app.state.settings
+    try:
+        async with session_scope(app.state.session_factory) as session:
+            added = await ensure_default_rules(
+                session, load_rules_file(settings.alerts_config_path)
+            )
+        log.info("alerts.rules_seeded", added=added)
+    except Exception as exc:
+        log.warning("alerts.rules_seed_failed", error=repr(exc))
 
 
 def build_job_runner(app: FastAPI) -> JobRunner:
@@ -69,6 +87,10 @@ def build_job_runner(app: FastAPI) -> JobRunner:
             path=Path(settings.flagd_config_path), target=load_target(settings.target_config_path)
         )
         runner.jobs.append(Job("flag_watcher", watcher.tick, settings.flag_watch_interval_s))
+    if settings.alerts_enabled:
+        evaluator = Evaluator(recovery_windows=settings.alert_recovery_windows)
+        app.state.evaluator = evaluator
+        runner.jobs.append(Job("alerts", evaluator.tick, settings.alert_interval_s))
     return runner
 
 
