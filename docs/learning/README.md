@@ -20,3 +20,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [6](day-06-2026-09-19-retention-service-edges.md) | 19 Sep | Retention, service edges, job runner, admin routes | #14 |
 | [7](day-07-2026-09-19-incidents-change-events.md) | 19 Sep | Incident tables + lifecycle, flag change watcher, cursor pagination, the runner-commit bug | #15 |
 | [8](day-08-2026-09-20-alert-evaluator.md) | 20 Sep | Alert evaluator: counters → rates, histogram → p95, streaks → incidents | #16 |
+| [9](day-09-2026-09-21-container-watcher-uptime.md) | 21 Sep | Container change watcher (Docker API), uptime ping | #17 |

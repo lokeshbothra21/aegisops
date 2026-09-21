@@ -16,6 +16,7 @@ from aegisops_api import __version__
 from aegisops_api.alerts.evaluator import Evaluator, ensure_default_rules, load_rules_file
 from aegisops_api.db import create_engine, create_session_factory, session_scope
 from aegisops_api.errors import install_error_handlers
+from aegisops_api.jobs.container_watcher import ContainerWatcher
 from aegisops_api.jobs.flag_watcher import FlagWatcher
 from aegisops_api.jobs.retention import run_retention
 from aegisops_api.jobs.runner import Job, JobRunner
@@ -47,6 +48,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         await runner.stop()
+        watcher = getattr(app.state, "container_watcher", None)
+        if watcher is not None:
+            await watcher.aclose()
         await engine.dispose()
         log.info("api.stop")
 
@@ -87,6 +91,14 @@ def build_job_runner(app: FastAPI) -> JobRunner:
             path=Path(settings.flagd_config_path), target=load_target(settings.target_config_path)
         )
         runner.jobs.append(Job("flag_watcher", watcher.tick, settings.flag_watch_interval_s))
+    if settings.docker_socket:
+        containers = ContainerWatcher(
+            socket_path=settings.docker_socket, project=settings.docker_compose_project
+        )
+        app.state.container_watcher = containers
+        runner.jobs.append(
+            Job("container_watcher", containers.tick, settings.container_watch_interval_s)
+        )
     if settings.alerts_enabled:
         evaluator = Evaluator(recovery_windows=settings.alert_recovery_windows)
         app.state.evaluator = evaluator

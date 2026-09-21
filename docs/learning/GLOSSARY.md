@@ -160,3 +160,11 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Error burst rule | Absolute count of error server spans in a window; exact under tail sampling | D8 |
 | Cascade (alert) | Downstream services alerting because an upstream one fails; one incident per service, merged later by the agent | D8 |
 | `metrics_flush_interval` | How often the span-metrics connector emits counters (10 s in our layer) | D8 |
+| Cold start | First request to a scaled-to-zero service takes seconds; monitors must retry | D9 |
+| Compose labels | `com.docker.compose.project` / `.service` on every container | D9 |
+| Docker Engine API | The daemon's HTTP API on a Unix socket (`/containers/json`, `/containers/{id}/json`) | D9 |
+| Image tag vs image id | Mutable name vs content hash; compare both to catch silent re-pulls | D9 |
+| Mock transport | `httpx.MockTransport`: script HTTP responses in tests | D9 |
+| RestartCount / StartedAt | Docker counters that separate crash-restarts from manual restarts | D9 |
+| Scheduled workflow | GitHub Actions `schedule:` cron; our uptime ping | D9 |
+| Unix domain socket | File-system IPC endpoint; httpx `uds=` | D9 |

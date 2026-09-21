@@ -45,6 +45,7 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Why is the incident lifecycle a table of allowed transitions?** Invalid states become unrepresentable; one mutator; trivially unit-tested.
 - **How do you know what changed before an alert without hooking every tool?** Watch the artefacts (flag file, container labels), diff snapshots, record before/after with an actor.
 - **Why cursor pagination?** Stable under inserts, O(log n), no COUNT.
+- **How do you detect a deploy or restart without CI hooks?** Snapshot the target's containers via the Docker API (image tag + id, StartedAt, RestartCount, replicas) and diff. (Day 9)
 
 ## CI/CD and platform
 - **Walk me through a merge to main.** Day 5 flow paragraph.
