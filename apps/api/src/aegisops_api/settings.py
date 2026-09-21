@@ -51,6 +51,18 @@ class Settings(BaseSettings):
     )
     flag_watch_interval_s: float = Field(default=2, ge=0.2, description="flagd file poll interval.")
 
+    docker_socket: str | None = Field(
+        default=None,
+        description="Docker socket to watch for deploy/restart/scale events; unset = off.",
+    )
+    docker_compose_project: str = Field(
+        default="opentelemetry-demo",
+        description="Compose project label whose containers are watched.",
+    )
+    container_watch_interval_s: float = Field(
+        default=10, ge=1, description="Container poll interval."
+    )
+
     alerts_enabled: bool = Field(default=True, description="Run the alert evaluator job.")
     alerts_config_path: str = Field(
         default="config/alerts.yaml", description="Default alert rules (seeded by name)."
