@@ -62,6 +62,17 @@ async def test_watcher_records_flag_changes(settings: Settings, tmp_path: Path) 
             _write(path, doc, 1_000_001)
             assert await watcher.tick(s) == 3
             await s.commit()
+            new_ids = [
+                r.id
+                for r in (
+                    await s.scalars(
+                        select(ChangeEvent)
+                        .where(ChangeEvent.actor == ACTOR)
+                        .order_by(ChangeEvent.id.desc())
+                        .limit(3)
+                    )
+                ).all()
+            ]
             rows = (
                 await s.scalars(
                     select(ChangeEvent)
@@ -70,6 +81,12 @@ async def test_watcher_records_flag_changes(settings: Settings, tmp_path: Path) 
                     .limit(3)
                 )
             ).all()
+            from sqlalchemy import delete
+
+            await s.execute(
+                delete(ChangeEvent).where(ChangeEvent.id.in_(new_ids))
+            )  # not real live changes
+            await s.commit()
     finally:
         await engine.dispose()
     by_flag = {r.after["flag"]: r for r in rows}

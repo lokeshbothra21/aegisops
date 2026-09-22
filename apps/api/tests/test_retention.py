@@ -11,7 +11,9 @@ from aegisops_api.jobs.retention import run_retention
 from aegisops_api.models import Log, MetricPoint, Span
 from aegisops_api.settings import Settings
 
-NOW = datetime(2030, 1, 1, 12, tzinfo=UTC)  # far future so real live rows are never "old"
+NOW = datetime(
+    2020, 1, 2, 12, tzinfo=UTC
+)  # far PAST: the cutoff is in 2020, so real rows are never deleted
 
 
 def _span(ts: datetime, scenario: str | None, trace: str) -> Span:

@@ -63,7 +63,7 @@ async def test_run_once_commits_what_the_job_wrote(settings: Settings) -> None:
     from datetime import UTC, datetime
     from uuid import uuid4
 
-    from sqlalchemy import select
+    from sqlalchemy import delete, select
 
     from aegisops_api.models import ChangeEvent, ChangeType
 
@@ -72,10 +72,14 @@ async def test_run_once_commits_what_the_job_wrote(settings: Settings) -> None:
     async def write(s: AsyncSession) -> str:
         s.add(
             ChangeEvent(
-                ts=datetime.now(UTC), type=ChangeType.flag, service=None,
-                before={}, after={"flag": marker}, actor="test",
+                ts=datetime.now(UTC),
+                type=ChangeType.flag,
+                service=None,
+                before={},
+                after={"flag": marker},
+                actor="test",
             )
-        )  # fmt: skip
+        )
         return marker
 
     engine = create_engine(settings)
@@ -88,6 +92,11 @@ async def test_run_once_commits_what_the_job_wrote(settings: Settings) -> None:
                     select(ChangeEvent).where(ChangeEvent.after["flag"].astext == marker)
                 )
             ).first()
+        async with factory() as cleanup:  # do not leave a fake live change event behind
+            await cleanup.execute(
+                delete(ChangeEvent).where(ChangeEvent.after["flag"].astext == marker)
+            )
+            await cleanup.commit()
     finally:
         await engine.dispose()
     assert row is not None, "job result was logged but not committed"
