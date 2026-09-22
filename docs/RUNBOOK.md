@@ -50,6 +50,17 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | Incident stuck `open` after recovery | Auto-resolve needs `AEGIS_ALERT_RECOVERY_WINDOWS` (3) healthy ticks **and** status `open`; anything investigated is the agent's/human's to close. |
 | API answers 503 "Database unavailable" | Postgres unreachable (connection refused / pool error). Local: `make db-up`. Prod: Supabase paused or secret wrong; `/readyz` shows the same. |
 
+## Tools / MCP server
+
+| Situation | Action |
+|---|---|
+| Try the agent's tools by hand | `uv run aegis-telemetry` speaks MCP over stdio; point any MCP client at it (Claude Desktop, an IDE, or `mcp` SDK `stdio_client`). Env: `AEGIS_DATABASE_URL`; replay: `AEGIS_SCENARIO_ID` + `AEGIS_FROZEN_NOW=<ISO>`. |
+| Latency numbers look 1000× off | Check `unit` on the `traces.span.metrics.duration` rows for that service; the tools normalise ms/s per series and report `bucket_layouts` when SDKs disagree. |
+| Local telemetry vanished after `make check` | Fixed 22 Sep: the retention test used a future cutoff. If it recurs, look for a test calling `run_retention` with `now` in the future. |
+| A tool returns `truncated: true` | Payload exceeded 4 KB; lists were trimmed. Narrow the window or lower `limit`; never raise the cap (token budget). |
+| A tool returns no data for a service | Check the service name spelling (it is `service.name` from the resource, e.g. `product-catalog`), the window, and that the API is ingesting (`/readyz`, `ingest.*` logs). Container metrics key on the container name. |
+| `IndeterminateDatatypeError` / `could not determine data type of parameter` | asyncpg cannot infer a bound parameter's type in that SQL position; wrap it in `CAST(:p AS text)` (or `text[]`, `timestamptz`). |
+
 ## Deploy (Cloud Run, project `aegisops-508519`, region asia-south1)
 
 Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh8946891910); the default config belongs to the ERP project.

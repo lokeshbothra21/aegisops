@@ -151,6 +151,12 @@ async def test_watcher_records_restart_and_deploy_events(settings: Settings) -> 
                     select(ChangeEvent).where(ChangeEvent.service == svc).order_by(ChangeEvent.id)
                 )
             ).all()
+            from sqlalchemy import delete
+
+            await s.execute(
+                delete(ChangeEvent).where(ChangeEvent.service == svc)
+            )  # not real live changes
+            await s.commit()
     finally:
         await watcher.aclose()
         await engine.dispose()

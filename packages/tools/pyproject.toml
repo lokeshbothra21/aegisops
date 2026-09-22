@@ -3,7 +3,16 @@ name = "aegisops-tools"
 version = "0.0.0"
 description = "AegisOps tools package"
 requires-python = ">=3.13,<3.14"
-dependencies = []
+dependencies = [
+    "asyncpg>=0.31",
+    "mcp>=1.0",
+    "pydantic>=2.13",
+    "sqlalchemy[asyncio]>=2.0.45",
+    "structlog>=25.6",
+]
+
+[project.scripts]
+aegis-telemetry = "aegisops_tools.server:main"
 
 [build-system]
 requires = ["hatchling"]

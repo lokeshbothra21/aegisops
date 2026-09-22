@@ -168,3 +168,19 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | RestartCount / StartedAt | Docker counters that separate crash-restarts from manual restarts | D9 |
 | Scheduled workflow | GitHub Actions `schedule:` cron; our uptime ping | D9 |
 | Unix domain socket | File-system IPC endpoint; httpx `uds=` | D9 |
+| asyncpg parameter typing | Ambiguous SQL parameters need `CAST(:p AS type)` | D10 |
+| Baseline comparison (tools) | Same statistic over now and before, returned as a delta | D10 |
+| Frozen now | Replay's fixed "now"; every relative window hangs off it | D10 |
+| Hour-labelled bucket | Row keyed by the hour it starts in; extend query end by 1 h | D10 |
+| Input schema (MCP) | JSON Schema of a tool's arguments; ours derived from the Python signature | D10 |
+| Instructions (MCP) | Server-level text passed to the model; states the untrusted rule | D10 |
+| Log signature | Numbers/hex/whitespace collapsed so similar lines group | D10 |
+| MCP server / tool | Advertises callable tools to LLM clients over a transport | D10 |
+| Output escaping | `<`/`>` → `\u003c`/`\u003e` so a closing tag cannot be forged from data | D10 |
+| Size cap / graceful truncation | Trim list tails to fit 4 KB, mark `truncated: true` | D10 |
+| Span tree flattening | Trace as (depth, service, name, kind, status, ms) rows | D10 |
+| stdio transport | JSON-RPC over a subprocess's stdin/stdout | D10 |
+| Untrusted-content envelope | `<telemetry untrusted="true">…</telemetry>` around every tool result | D10 |
+| Depth-first tree focus | Show error spans, ancestors and children first; fill in tree order | D10 |
+| Destructive test direction | Pick cutoffs so real data can never qualify (past, not future) | D10 |
+| Unit normalisation | Read the `unit` column and convert per series before merging | D10 |

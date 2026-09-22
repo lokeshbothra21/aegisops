@@ -83,7 +83,7 @@ async def error_rate(
 _HIST_ENDPOINTS_SQL = text(
     """
     WITH pts AS (
-        SELECT service, attrs->>'span.name' AS sn, attrs->>'status.code' AS sc, ts,
+        SELECT service, attrs->>'span.name' AS sn, attrs->>'status.code' AS sc, ts, unit,
                attrs->'otel.histogram' AS h
         FROM metric_points
         WHERE metric_name = :metric
@@ -91,13 +91,13 @@ _HIST_ENDPOINTS_SQL = text(
           AND ts >= CAST(:start AS timestamptz) - interval '1 hour' AND ts < :end
           AND scenario_id IS NOT DISTINCT FROM :scenario_id
     ), latest AS (
-        SELECT DISTINCT ON (service, sn, sc) service, sn, sc, h
+        SELECT DISTINCT ON (service, sn, sc) service, sn, sc, h, unit
         FROM pts WHERE ts >= :start ORDER BY service, sn, sc, ts DESC
     ), base AS (
         SELECT DISTINCT ON (service, sn, sc) service, sn, sc, h
         FROM pts WHERE ts < :start ORDER BY service, sn, sc, ts DESC
     )
-    SELECT l.service, b.h AS first_h, l.h AS last_h
+    SELECT l.service, b.h AS first_h, l.h AS last_h, l.unit
     FROM latest l LEFT JOIN base b USING (service, sn, sc)
     """
 )
@@ -154,10 +154,17 @@ def percentile_from_buckets(bounds: list[float], counts: list[int], q: float) ->
     return bounds[-1] if bounds else None
 
 
+UNIT_TO_MS = {"ms": 1.0, "s": 1000.0, "us": 0.001, "ns": 1e-6}
+
+
 async def p95_ms(
     session: AsyncSession, start: datetime, end: datetime, scenario_id: str | None
 ) -> Readings:
-    """p95 of server-span duration per service over the window (seconds → ms)."""
+    """p95 of server-span duration per service over the window, in ms.
+
+    Series merge only when their (unit-normalised) bucket bounds match; per service the
+    largest such group wins. The demo mixes `ms` and `s` histograms across SDKs.
+    """
     rows = await session.execute(
         _HIST_ENDPOINTS_SQL,
         {
@@ -168,24 +175,30 @@ async def p95_ms(
             "scenario_id": scenario_id,
         },
     )
-    per_service: dict[str, tuple[list[float], list[int]]] = {}
-    for service, first_h, last_h in rows:
+    groups: dict[tuple[str, tuple[float, ...]], list[int]] = {}
+    for service, first_h, last_h, unit in rows:
         first_h, last_h = _as_dict(first_h), _as_dict(last_h)
         if last_h is None:
             continue
-        bounds, counts = _delta_buckets(first_h, last_h)
-        if service in per_service and per_service[service][0] == bounds:
-            acc = per_service[service][1]
-            per_service[service] = (bounds, [x + y for x, y in zip(acc, counts, strict=True)])
-        elif service not in per_service:
-            per_service[service] = (bounds, counts)
+        scale = UNIT_TO_MS.get(unit or "ms", 1.0)
+        bounds = tuple(round(float(b) * scale, 6) for b in last_h.get("explicit_bounds", []))
+        _, counts = _delta_buckets(first_h, last_h)
+        if len(counts) != len(bounds) + 1:
+            continue
+        acc = groups.setdefault((service, bounds), [0] * len(counts))
+        for i, v in enumerate(counts):
+            acc[i] += v
+    best: dict[str, tuple[tuple[float, ...], list[int]]] = {}
+    for (service, bounds), counts in groups.items():
+        if service not in best or sum(counts) > sum(best[service][1]):
+            best[service] = (bounds, counts)
     out: Readings = {}
-    for service, (bounds, counts) in per_service.items():
+    for service, (bounds, counts) in best.items():
         if sum(counts) < MIN_CALLS:
             continue
-        p = percentile_from_buckets(bounds, counts, 0.95)
+        p = percentile_from_buckets(list(bounds), counts, 0.95)
         if p is not None:
-            out[service] = p * 1000.0  # span_metrics duration unit is seconds
+            out[service] = p  # already in ms
     return out
 
 

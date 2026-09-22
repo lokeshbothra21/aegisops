@@ -43,7 +43,7 @@ flowchart LR
 | `aegisops-api` | `apps/api/` | Python 3.13, FastAPI, SQLAlchemy 2 async, Alembic, structlog | Ingest, health probes, RFC 7807 errors; later: alerts scheduler, incidents, runs (SSE), approvals, bench results | Built: ingest + probes (E1.1, E1.2, E8.4) |
 | Database | Postgres 17 + pgvector | `pgvector/pgvector:pg17` locally on :5433; Supabase in prod | Single store for telemetry, derived tables, incidents/runs, LangGraph checkpoints, embeddings (ADR-003) | Built: telemetry tables; Supabase pending (E11.5) |
 | `agent` package | `packages/agent/` | LangGraph 1.x, Pydantic v2 | Graph, nodes, schemas, budgets, verifier, model router | Placeholder |
-| `tools` package | `packages/tools/` | MCP Python SDK | Read-only telemetry MCP server; actions module (not MCP, ADR-007) | Placeholder |
+| `tools` package | `packages/tools/` | raw SQL + mcp SDK 2.x | Nine read-only telemetry tools (`ToolContext` for live/replay), untrusted envelope, `aegis-telemetry` MCP server over stdio; actions module (not MCP) comes in W6 | Built: tools + server (W3, E9.1) |
 | Jobs + incidents (in the API for now) | `apps/api/.../jobs`, `.../incidents` | asyncio `JobRunner`, SQL | Retention, `service_edges` derivation, flagd change watcher, Docker container watcher (deploy/restart/scale); incident state machine | Built (E1.4, E1.5, E2.1, E2.2-obs, E2.4) |
 | Alerts (in the API) | `apps/api/.../alerts` | SQL readers + `Evaluator` | Rules from `config/alerts.yaml` → `alert_rules`; every 30 s: error_rate / p95_ratio / memory / kafka lag per service → incidents via the state machine | Built (E2.3) |
 | `web` | `apps/web/` (not created) | Next.js 15, TypeScript, Tailwind, shadcn/ui | Incidents list, incident detail with live SSE timeline, Benchmark, Failures | Planned (W5) |
@@ -131,3 +131,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 | 19 Sep 2026 | Week 2 day 1: jobs (retention, service_edges, flag watcher), incident tables + lifecycle, incidents read API. |
 | 20 Sep 2026 | Week 2 day 2: alert evaluator (deterministic detection, ADR-008) opens incidents; 503 on DB outage. |
 | 21 Sep 2026 | Container watcher (Docker API) for deploy/restart/scale change events; uptime ping workflow. |
+| 22 Sep 2026 | Tools package: nine read tools, untrusted envelope, MCP server (ADR-007). |
