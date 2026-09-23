@@ -48,19 +48,49 @@ class LLMClient(Protocol):
     ) -> LLMResult[T]: ...
 
 
+UNSUPPORTED_KEYWORDS = frozenset(
+    {
+        "title",
+        "default",
+        "additionalProperties",
+        "pattern",
+        "minLength",
+        "maxLength",
+        "minimum",
+        "maximum",
+        "exclusiveMinimum",
+        "exclusiveMaximum",
+        "$schema",
+    }
+)
+
+
 def _schema_for(schema: type[BaseModel]) -> dict[str, Any]:
-    """JSON Schema the providers accept: no $defs (inline), no `title` noise."""
+    """Pydantic JSON Schema -> the subset Gemini's `responseSchema` accepts (Groq accepts it too).
+
+    Inlines `$defs`, drops keywords Gemini rejects (validation still happens in Pydantic on
+    our side), and turns `anyOf: [X, {type: null}]` into `X` + `nullable: true`.
+    """
     raw = schema.model_json_schema()
     defs = raw.pop("$defs", {})
 
     def inline(node: Any) -> Any:
-        if isinstance(node, dict):
-            if "$ref" in node:
-                return inline(defs[node["$ref"].rsplit("/", 1)[-1]])
-            return {k: inline(v) for k, v in node.items() if k not in ("title", "default")}
         if isinstance(node, list):
             return [inline(x) for x in node]
-        return node
+        if not isinstance(node, dict):
+            return node
+        if "$ref" in node:
+            return inline(defs[node["$ref"].rsplit("/", 1)[-1]])
+        if "anyOf" in node:
+            options = [o for o in node["anyOf"] if o.get("type") != "null"]
+            nullable = len(options) != len(node["anyOf"])
+            if len(options) == 1:
+                merged = {**{k: v for k, v in node.items() if k != "anyOf"}, **options[0]}
+                out = inline(merged)
+                if nullable:
+                    out["nullable"] = True
+                return out
+        return {k: inline(v) for k, v in node.items() if k not in UNSUPPORTED_KEYWORDS}
 
     result: dict[str, Any] = inline(raw)
     return result

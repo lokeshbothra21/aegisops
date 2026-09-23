@@ -42,6 +42,13 @@ async def test_error_rate_uses_counters_and_exact_error_series(scenario) -> None
     ]
 
 
+async def test_error_rate_says_no_data_instead_of_zero(scenario) -> None:  # type: ignore[no-untyped-def]
+    """Found live: the model read calls=0 for an unknown service as 'dependency down'."""
+    s, ctx, _ = scenario
+    r = await telemetry.get_error_rate(s, ctx, "flagd", window_minutes=5)
+    assert r["calls"] is None and r["error_rate"] is None and "no span-metrics data" in r["note"]
+
+
 async def test_latency_percentiles_now_vs_baseline(scenario) -> None:  # type: ignore[no-untyped-def]
     s, ctx, _ = scenario
     r = await telemetry.get_latency_percentiles(s, ctx, "payment", window_minutes=5)

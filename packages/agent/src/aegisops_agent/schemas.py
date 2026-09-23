@@ -52,9 +52,28 @@ class Triage(BaseModel):
     summary: str = Field(max_length=400)
 
 
+class ToolArgs(BaseModel):
+    """Every argument any read tool accepts, all optional. Typed rather than a free-form dict
+    because Gemini's response-schema subset cannot express open objects; the tool runner drops
+    the ones a given tool does not take."""
+
+    service: str | None = None
+    window_minutes: int | None = Field(default=None, ge=1, le=240)
+    limit: int | None = Field(default=None, ge=1, le=20)
+    depth: int | None = Field(default=None, ge=1, le=2)
+    hours: int | None = Field(default=None, ge=1, le=24)
+    after_minutes: int | None = Field(default=None, ge=1, le=240)
+    before_minutes: int | None = Field(default=None, ge=1, le=240)
+    text_query: str | None = None
+    k: int | None = Field(default=None, ge=1, le=3)
+
+    def as_kwargs(self) -> dict[str, Any]:
+        return self.model_dump(exclude_none=True)
+
+
 class ToolRequest(BaseModel):
     tool: str
-    args: dict[str, Any] = Field(default_factory=dict)
+    args: ToolArgs = Field(default_factory=ToolArgs)
 
 
 class Hypothesis(BaseModel):

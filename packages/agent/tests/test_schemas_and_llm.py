@@ -44,11 +44,40 @@ def test_hypotheses_ids_unique_and_capped() -> None:
         )
 
 
-def test_json_schema_is_inlined_without_refs_or_titles() -> None:
-    schema = _schema_for(Hypotheses)
-    dumped = str(schema)
-    assert "$ref" not in dumped and "$defs" not in dumped and "'title'" not in dumped
-    assert schema["properties"]["items"]["items"]["properties"]["tools_to_run"]["type"] == "array"
+def test_json_schema_is_gemini_safe() -> None:
+    """Gemini's responseSchema subset: no $ref/$defs, no additionalProperties/pattern/min-max
+    keywords, Optional[X] becomes X + nullable (found live: 400 'Unknown name additionalProperties')."""
+    from aegisops_agent.schemas import RootCause
+
+    for model in (Hypotheses, RootCause):
+        dumped = str(_schema_for(model))
+        for bad in (
+            "$ref",
+            "$defs",
+            "'title'",
+            "additionalProperties",
+            "'pattern'",
+            "minLength",
+            "maxLength",
+            "'minimum'",
+            "'maximum'",
+            "anyOf",
+        ):
+            assert bad not in dumped, f"{model.__name__}: {bad}"
+    h = _schema_for(Hypotheses)
+    args = h["properties"]["items"]["items"]["properties"]["tools_to_run"]["items"]["properties"][
+        "args"
+    ]
+    assert args["type"] == "object" and args["properties"]["window_minutes"] == {
+        "type": "integer",
+        "nullable": True,
+    }
+    rc = _schema_for(RootCause)
+    assert rc["properties"]["evidence_refs"]["items"]["properties"]["claimed_value"] == {
+        "type": "number",
+        "nullable": True,
+        "description": "a number the claim asserts, if any",
+    }
 
 
 async def test_recorded_llm_replays_in_order_then_repeats() -> None:

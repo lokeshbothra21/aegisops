@@ -14,6 +14,13 @@ The first version of the investigation agent, in `packages/agent`, built so that
 ## Live result
 End to end on the seeded S1 scenario with the recorded model: 4 model calls, 10 tool calls, tokens 3,200 in / 800 out, root cause `dependency_errors` at confidence 0.9, `partial=false`, six checkpoints written for the thread. Week 3's exit criterion ("end-to-end on S1 producing a RootCause JSON") is met with recorded outputs; the same command with `AEGIS_GEMINI_API_KEY` set and no `--recorded` will make the first real model run.
 
+## The first REAL model run (same day, PR #22)
+With the keys in `.env`, the same command without `--recorded`:
+1. **Attempt 1, 404:** `gemini-2.5-flash-lite` is retired for new keys. The models list from the API showed the current family; pinned `gemini-3.5-flash` (primary) and `gemini-3.5-flash-lite` (triage). Groq no longer serves llama-3.3; the fallback is `openai/gpt-oss-120b`. Pins, not `-latest` aliases, so benchmark runs stay reproducible.
+2. **Attempt 2, 400 `Unknown name "additionalProperties"`:** Gemini's `responseSchema` is a *subset* of JSON Schema: no `$ref`, `additionalProperties`, `pattern`, `min/maxLength`, `minimum/maximum`, and `Optional[X]` must be `X` + `nullable: true`, not `anyOf`. `_schema_for` now translates; free-form `args: dict` became a typed `ToolArgs` model.
+3. **Attempt 3, success in 145 s:** 4 model calls, 14 tool calls, 7,040 tokens in / 1,729 out, **one automatic fallback** (Gemini 503 "high demand" on `plan` → Groq answered). Output: a valid `RootCause` at confidence 0.9.
+4. **And it was wrong.** It concluded `dependency_down` ("flagd unreachable, connection refused"), citing a synthetic `connection refused` log line from the seed and *"flagd received 0 calls"*. The expected answer was `dependency_errors` from the flag flip, which it never cited. Two lessons: the model treated a tool's `calls: 0` for a service with **no data** as an outage, so `get_error_rate` now returns `calls: null` plus an explicit "no data" note; and a confident, well-formed, wrong answer is precisely why `verify_evidence` (E4.1, next) checks every citation against the store before a human sees it. The 145 s is over the 90 s p50 target too; latency work comes with the budgets tuning in Week 4.
+
 ## How a run flows
 `run_investigation()` builds a `ToolRunner` (session factory + `ToolContext` + budget), the graph with `Deps(llm, tools, budget)`, and invokes it with the incident's service and alert text under a `thread_id`. **triage** pulls a 5-minute snapshot (error rate, latency, top error logs) and asks the model for service/symptom/window. **plan** fetches the dependency graph (depth 2) and the last hour of change events, shows the model the catalogue of tools it may use, and gets ≤ 3 hypotheses each with tool requests. **investigate** executes those requests (arguments filtered to the tool's real parameters), collects the untrusted envelopes, and asks once for findings with evidence references. **root_cause** turns everything into the final `RootCause`, marking `partial` if a budget tripped. Every node appends an event to `state.events` (the future SSE stream) and updates `usage`.
 
@@ -47,6 +54,12 @@ End to end on the seeded S1 scenario with the recorded model: 4 model calls, 10 
 
 **Weak vs strong copyleft (ADR-017).** LGPL/MPL: you may import the library from permissive or proprietary code; only changes to the library itself must be shared. GPL: the whole combined program must be GPL. AGPL: GPL plus network use counts as distribution. Our dependency review denies GPL/AGPL/SSPL and allows LGPL/MPL as unmodified dependencies; `psycopg` (LGPL-3.0), required by LangGraph's checkpointer, triggered the decision.
 
+**Gemini response-schema subset.** A restricted JSON Schema: types, enums, properties, required, items, min/maxItems, nullable, description. Anything else is a 400. Translate from Pydantic's schema, keep validation on your side.
+
+**No data ≠ zero.** A tool that returns `0` when it has nothing invites a false conclusion; return `null` and say why.
+
+**Confidently wrong.** A structured, validated, high-confidence answer can still be wrong; structure guarantees shape, not truth. The verifier exists for exactly this.
+
 **Logs to stderr, data to stdout.** A CLI whose stdout is one JSON document composes with pipes; structlog is pointed at stderr.
 
 ## Interview questions
@@ -56,4 +69,5 @@ End to end on the seeded S1 scenario with the recorded model: 4 model calls, 10 
 4. *How does provider fallback work and when does it not?* Retryable errors (quota, 5xx, timeout) retry once on the secondary; 4xx client errors fail fast. Logged as `model_fallback` for the cost dashboard.
 5. *Where does the checkpoint live and who owns those tables?* Postgres, same database, tables created by LangGraph's saver; Alembic is told to ignore them.
 6. *A dependency is LGPL and your project is Apache-2.0. Problem?* No, if used unmodified as a library; GPL or AGPL would be. Our CI encodes exactly that line. (ADR-017)
-7. *How do you keep the model from calling a tool it should not?* Node-scoped allowlist enforced at execution, arguments filtered to the real signature, and denied calls still burn budget.
+7. *Your agent's first real run was confidently wrong. What did you do?* Read the evidence it cited, found it had read a `0` for a service with no data as an outage, made the tool say "no data" explicitly, and kept the verifier as the systemic answer: every citation is checked before a human sees it.
+8. *How do you keep the model from calling a tool it should not?* Node-scoped allowlist enforced at execution, arguments filtered to the real signature, and denied calls still burn budget.

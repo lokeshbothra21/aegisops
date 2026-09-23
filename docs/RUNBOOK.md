@@ -82,6 +82,8 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 |---|---|
 | Run an investigation by hand | `uv run aegis-investigate --service payment --alert "<alert summary>"` (live rows) or add `--scenario <id> --frozen-now <ISO>` for replay. `--recorded packages/agent/tests/cassettes/s1_payment_failure.yaml` needs no model key. Output: one JSON document on stdout; logs on stderr. |
 | `no client for 'gemini:...' (set AEGIS_GEMINI_API_KEY)` | Put the key in `.env` locally / Secret Manager in prod. `config/models.yaml` names providers; both `AEGIS_GEMINI_API_KEY` and `AEGIS_GROQ_API_KEY` should exist so fallback works. |
+| `gemini 404 ... no longer available` | The pinned model was retired. List models: `curl "https://generativelanguage.googleapis.com/v1beta/models?key=$AEGIS_GEMINI_API_KEY"` and update `config/models.yaml` (pin an exact id, not `-latest`). |
+| `gemini 400 Invalid JSON payload ... Unknown name` | A Pydantic schema feature Gemini's subset rejects; extend `UNSUPPORTED_KEYWORDS` / the `anyOf` handling in `llm._schema_for`. |
 | `model_fallback` warnings | Primary returned 429/5xx/timeout; the secondary answered. Frequent fallbacks = quota exhausted; check the provider console. |
 | Run ends with `partial: true` | A budget tripped (`budget_exceeded` says which: tool_calls / tokens / seconds). The report is still valid but lower-confidence. Raise the budget only for benchmarking. |
 | `model output failed ... validation` | The model returned JSON that does not match the schema; retryable, the router falls back once. Persistent → tighten the prompt in `packages/agent/src/aegisops_agent/prompts/`. |
