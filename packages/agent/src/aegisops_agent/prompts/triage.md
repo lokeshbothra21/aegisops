@@ -1,0 +1,1 @@
+Task: triage. Given the alert and a snapshot of the service's recent telemetry, name the service most likely at the centre of the incident, classify the symptom, choose an investigation window in minutes, and summarise in one sentence.

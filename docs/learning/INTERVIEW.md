@@ -33,6 +33,13 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Why `pool_pre_ping`?** Hosted DBs drop idle connections; turn a stale connection into a reconnect, not a 500.
 - **How will you compute p95 from stored histograms?** Bucket counts + explicit bounds in `attrs.otel.histogram`; interpolate within the bucket that crosses the 95th percentile.
 
+## Agent
+- **Why a fixed graph rather than a free-form tool loop?** Bounded cost (4 model calls), deterministic tests, authorization by topology. (ADR-016, Day 11)
+- **How is the agent tested without a model key?** Structured outputs + per-node recorded responses; graph, tools and Postgres are real.
+- **What happens on budget exhaustion?** Flag in state → `root_cause` with `partial=true`; the report still ships.
+- **How does model fallback work?** Router retries retryable errors once on the secondary; 4xx fail fast; `model_fallback` logged.
+- **Who owns the checkpoint tables?** LangGraph's saver; Alembic ignores `checkpoint*` via `include_object`.
+
 ## Tools and MCP
 - **Why do tools return ≤ 4 KB?** Token budget and reasoning quality; aggregate in SQL. (Day 10)
 - **How do the same tools serve live and replay?** `scenario_id` filter + frozen `now` in the tool context; identical code.
