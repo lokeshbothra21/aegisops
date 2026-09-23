@@ -34,6 +34,9 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **How will you compute p95 from stored histograms?** Bucket counts + explicit bounds in `attrs.otel.histogram`; interpolate within the bucket that crosses the 95th percentile.
 
 ## Agent
+- **How do you verify an LLM's claims without another LLM?** Structured citations checked by code against the store; drop failures; confidence × verified/cited; keep the claimed value for calibration. (Day 12)
+- **What did change correlation change?** The model cited the flag flip once the scored change list was in its input; before, it ignored it.
+- **How do you handle a slow provider?** 30 s timeout = down; fall back to the secondary; log the exception type.
 - **Why a fixed graph rather than a free-form tool loop?** Bounded cost (4 model calls), deterministic tests, authorization by topology. (ADR-016, Day 11)
 - **How is the agent tested without a model key?** Structured outputs + per-node recorded responses; graph, tools and Postgres are real.
 - **What happens on budget exhaustion?** Flag in state → `root_cause` with `partial=true`; the report still ships.

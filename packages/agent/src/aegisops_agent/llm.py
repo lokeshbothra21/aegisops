@@ -25,6 +25,9 @@ from pydantic import BaseModel, ValidationError
 
 log = structlog.get_logger()
 T = TypeVar("T", bound=BaseModel)
+# A provider that has not answered in 30 s is treated as down and the secondary is tried;
+# two 60 s timeouts once pushed a run past the 180 s budget (23 Sep 2026).
+PROVIDER_TIMEOUT_S = 30.0
 
 
 @dataclass
@@ -113,7 +116,9 @@ def _parse[T: BaseModel](schema: type[T], text: str) -> T:
 class GeminiClient:
     api_key: str
     base_url: str = "https://generativelanguage.googleapis.com/v1beta"
-    http: httpx.AsyncClient = field(default_factory=lambda: httpx.AsyncClient(timeout=60))
+    http: httpx.AsyncClient = field(
+        default_factory=lambda: httpx.AsyncClient(timeout=PROVIDER_TIMEOUT_S)
+    )
 
     async def complete[T: BaseModel](
         self, model: str, system: str, user: str, schema: type[T]
@@ -152,7 +157,9 @@ class GeminiClient:
 class GroqClient:
     api_key: str
     base_url: str = "https://api.groq.com/openai/v1"
-    http: httpx.AsyncClient = field(default_factory=lambda: httpx.AsyncClient(timeout=60))
+    http: httpx.AsyncClient = field(
+        default_factory=lambda: httpx.AsyncClient(timeout=PROVIDER_TIMEOUT_S)
+    )
 
     async def complete[T: BaseModel](
         self, model: str, system: str, user: str, schema: type[T]
@@ -244,7 +251,7 @@ class Router:
                 "model_fallback",
                 node=node,
                 **{"from": primary, "to": self.config.secondary},
-                error=str(exc)[:200],
+                error=f"{type(exc).__name__}: {str(exc)[:200]}",
             )
             if self.on_fallback:
                 self.on_fallback(node, self.config.secondary)

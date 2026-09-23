@@ -1,9 +1,11 @@
-"""The investigation graph (E3.1): triage -> plan -> investigate -> root_cause.
+"""The investigation graph (E3.1): triage -> plan -> investigate -> correlate_changes ->
+root_cause -> verify_evidence.
 
-Every node is `async def node(state) -> partial state`, reads its prompt from
-`prompts/`, calls the model through the router with a Pydantic schema (E3.2), and
-records usage. A budget breach anywhere jumps to `root_cause` with `partial=True`
-(E3.3). State is checkpointed after each node by LangGraph's Postgres saver (ADR-006).
+Every model-facing node is `async def node(state) -> partial state`, reads its prompt from
+`prompts/`, calls the model through the router with a Pydantic schema (E3.2) and records
+usage. `correlate_changes` (E3.4) and `verify_evidence` (E4.1) are deterministic: no model.
+A budget breach anywhere jumps to `root_cause` with `partial=True` (E3.3). State is
+checkpointed after each node by LangGraph's Postgres saver (ADR-006).
 """
 
 from __future__ import annotations
@@ -13,13 +15,14 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Literal, TypedDict, cast
+from typing import Any, TypedDict, cast
 
 import structlog
 from langgraph.graph import END, START, StateGraph
 from langgraph.types import Checkpointer
 from pydantic import BaseModel
 
+from aegisops_agent.correlate import correlate_changes as _correlate
 from aegisops_agent.llm import LLMClient, LLMResult
 from aegisops_agent.schemas import (
     Budget,
@@ -27,14 +30,17 @@ from aegisops_agent.schemas import (
     Hypotheses,
     RootCause,
     RootCauseCategory,
+    ToolRequest,
     Triage,
     Usage,
 )
 from aegisops_agent.tools import BudgetExceededError, ToolRunner, tool_catalogue
+from aegisops_agent.verifier import Verifier
 
 log = structlog.get_logger()
 PROMPTS = Path(__file__).parent / "prompts"
-PROMPT_VERSION = "2026-09-23.1"
+PROMPT_VERSION = "2026-09-23.2"
+MAX_FOLLOW_UP_ROUNDS = 1
 
 
 class AgentState(TypedDict, total=False):
@@ -47,7 +53,9 @@ class AgentState(TypedDict, total=False):
     hypotheses: dict[str, Any]
     tool_results: dict[str, list[dict[str, Any]]]  # hypothesis id -> [{tool, args, result}]
     findings: dict[str, Any]
+    correlation: dict[str, Any]
     root_cause: dict[str, Any]
+    verified_root_cause: dict[str, Any]
     # bookkeeping
     usage: dict[str, Any]
     budget_exceeded: str | None
@@ -100,6 +108,22 @@ async def _ask[T: BaseModel](
     deps: Deps, node: str, user: dict[str, Any], schema: type[T]
 ) -> LLMResult[T]:
     return await deps.llm.complete(node, load_prompt(node), json.dumps(user, default=str), schema)
+
+
+async def _run_requests(
+    deps: Deps, hypothesis_id: str, requests: list[ToolRequest]
+) -> list[dict[str, Any]] | None:
+    """Execute tool requests for one hypothesis; None when the tool-call budget trips."""
+    out: list[dict[str, Any]] = []
+    for req in requests:
+        try:
+            res = await deps.tools.call(
+                "investigate", hypothesis_id, req.tool, req.args.as_kwargs()
+            )
+        except BudgetExceededError:
+            return None
+        out.append({"tool": req.tool, "args": req.args.as_kwargs(), "result": res})
+    return out
 
 
 type NodeFn = Callable[[AgentState], Awaitable[AgentState]]
@@ -181,18 +205,11 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
         results: dict[str, list[dict[str, Any]]] = {}
         breached: str | None = None
         for h in hyps.items:
-            results[h.id] = []
-            for req in h.tools_to_run:
-                try:
-                    out = await deps.tools.call("investigate", h.id, req.tool, req.args.as_kwargs())
-                except BudgetExceededError as exc:
-                    breached = exc.what
-                    break
-                results[h.id].append(
-                    {"tool": req.tool, "args": req.args.as_kwargs(), "result": out}
-                )
-            if breached:
+            ran = await _run_requests(deps, h.id, h.tools_to_run)
+            if ran is None:
+                breached = "tool_calls"
                 break
+            results[h.id] = ran
         usage.tool_calls = deps.tools.usage.tool_calls
         if breached:
             return {
@@ -208,17 +225,56 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             Findings,
         )
         _account(usage, result)
+        # one bounded follow-up round (ADR-016): the model may ask for a few more tools
+        rounds = 0
+        while result.value.follow_up and rounds < MAX_FOLLOW_UP_ROUNDS:
+            rounds += 1
+            extra = await _run_requests(deps, "follow-up", result.value.follow_up)
+            usage.tool_calls = deps.tools.usage.tool_calls
+            if extra is None:
+                breached = "tool_calls"
+                break
+            results["follow-up"] = extra
+            result = await _ask(
+                deps,
+                "investigate",
+                {
+                    "hypotheses": state["hypotheses"],
+                    "tool_results": results,
+                    "follow_up_round": rounds,
+                },
+                Findings,
+            )
+            _account(usage, result)
+        supported = [f.hypothesis_id for f in result.value.items if f.supports]
         return {
             "tool_results": results,
             "findings": result.value.model_dump(),
             "usage": usage.model_dump(),
-            "budget_exceeded": _check_budget(state, deps, usage),
+            "budget_exceeded": breached or _check_budget(state, deps, usage),
             "events": _event(
                 state,
                 "investigate",
                 "output",
-                supported=[f.hypothesis_id for f in result.value.items if f.supports],
+                supported=supported,
+                follow_up_rounds=rounds,
                 model=result.model,
+            ),
+        }
+
+    async def correlate(state: AgentState) -> AgentState:
+        """Deterministic (E3.4): no model, no budget."""
+        service = state.get("triage", {}).get("service", state["service"])
+        async with deps.tools.factory() as session:
+            corr = await _correlate(session, deps.tools.ctx, service)
+        return {
+            "correlation": corr.model_dump(),
+            "events": _event(
+                state,
+                "correlate_changes",
+                "output",
+                temporal_score=corr.temporal_score,
+                top=[e.summary for e in corr.events[:3]],
             ),
         }
 
@@ -230,6 +286,7 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             "triage": state.get("triage"),
             "hypotheses": state.get("hypotheses"),
             "findings": state.get("findings"),
+            "change_correlation": state.get("correlation"),
             "partial": partial,
             "budget_exceeded": state.get("budget_exceeded"),
             "allowed_categories": [c.value for c in RootCauseCategory],
@@ -260,10 +317,37 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             "events": _event(state, "root_cause", "output", **rc.model_dump(), model=result.model),
         }
 
-    return {"triage": triage, "plan": plan, "investigate": investigate, "root_cause": root_cause}
+    async def verify(state: AgentState) -> AgentState:
+        """Deterministic (E4.1): drop unverifiable refs, scale confidence."""
+        rc = RootCause.model_validate(state["root_cause"])
+        window = int(state.get("triage", {}).get("window_minutes", 15))
+        verifier = Verifier(deps.tools.factory, deps.tools.ctx, window_minutes=window)
+        verified = await verifier.verify(rc)
+        return {
+            "verified_root_cause": verified.model_dump(),
+            "events": _event(
+                state,
+                "verify_evidence",
+                "output",
+                cited=verified.verification.cited,
+                verified=verified.verification.verified,
+                claimed_confidence=verified.claimed_confidence,
+                confidence=verified.confidence,
+                dropped=[d.reason for d in verified.verification.dropped],
+            ),
+        }
+
+    return {
+        "triage": triage,
+        "plan": plan,
+        "investigate": investigate,
+        "correlate_changes": correlate,
+        "root_cause": root_cause,
+        "verify_evidence": verify,
+    }
 
 
-def _after(node_next: str) -> Callable[[AgentState], Literal["root_cause"] | str]:
+def _after(node_next: str) -> Callable[[AgentState], str]:
     def route(state: AgentState) -> str:
         return "root_cause" if state.get("budget_exceeded") else node_next
 
@@ -280,6 +364,12 @@ def build_graph(deps: Deps, checkpointer: Checkpointer | None = None) -> Any:
     g.add_conditional_edges(
         "plan", _after("investigate"), {"investigate": "investigate", "root_cause": "root_cause"}
     )
-    g.add_conditional_edges("investigate", _after("root_cause"), {"root_cause": "root_cause"})
-    g.add_edge("root_cause", END)
+    g.add_conditional_edges(
+        "investigate",
+        _after("correlate_changes"),
+        {"correlate_changes": "correlate_changes", "root_cause": "root_cause"},
+    )
+    g.add_edge("correlate_changes", "root_cause")
+    g.add_edge("root_cause", "verify_evidence")
+    g.add_edge("verify_evidence", END)
     return g.compile(checkpointer=checkpointer, name="aegisops-investigation")

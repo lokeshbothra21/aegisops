@@ -202,3 +202,11 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Confidently wrong | Valid, high-confidence, incorrect output; structure ≠ truth; verifier's job | D11 |
 | Gemini response-schema subset | Restricted JSON Schema (no $ref/additionalProperties/pattern; nullable not anyOf) | D11 |
 | No data ≠ zero | Tools return null + a note when nothing was found, never 0 | D11 |
+| Bounded follow-up | One extra round of ≤ 3 tool calls in investigate, then conclude | D12 |
+| Claimed vs verified confidence | Model's confidence vs confidence after evidence checks; the gap measures calibration | D12 |
+| Identifying token | Flag/service/type word used to match a change ref to an event | D12 |
+| Provider timeout (30 s) | Slow provider treated as down → fallback | D12 |
+| Reaction vs cause | Changes after the alert are scored low, not hidden | D12 |
+| Temporal correlation | recency × proximity score for change events near the alert | D12 |
+| Tolerance band | ±20 % relative + 0.01 absolute for numeric claims | D12 |
+| Window ambiguity | Recompute a cited number over standard windows; accept any match | D12 |
