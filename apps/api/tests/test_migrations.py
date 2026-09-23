@@ -6,12 +6,14 @@ from sqlalchemy import Connection, inspect
 
 from aegisops_api.db import create_engine
 from aegisops_api.models import Base
+from aegisops_api.models.base import include_object
 from aegisops_api.settings import Settings
 
 
 def _tables_and_diff(conn: Connection) -> tuple[set[str], list[object]]:
     tables = set(inspect(conn).get_table_names())
-    ctx = MigrationContext.configure(conn)
+    # same filter as migrations/env.py: LangGraph's checkpoint* tables are not ours
+    ctx = MigrationContext.configure(conn, opts={"include_object": include_object})
     return tables, compare_metadata(ctx, Base.metadata)
 
 

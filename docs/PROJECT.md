@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.13 |
+| Document version | 1.0.14 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -156,11 +156,11 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 ### E3 — Investigation agent
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
-| E3.1 | LangGraph skeleton: triage → plan → investigate → root_cause, Postgres checkpointer | M | W3 | todo |
-| E3.2 | Structured outputs (Pydantic) for every node | M | W3 | todo |
-| E3.3 | Budgets: 15 tool calls, 60k tokens, 180 s; `budget_exceeded` outcome with partial report | M | W4 | todo |
+| E3.1 | LangGraph skeleton: triage → plan → investigate → root_cause, Postgres checkpointer | M | W3 | done (PR #21) |
+| E3.2 | Structured outputs (Pydantic) for every node | M | W3 | done (PR #21) |
+| E3.3 | Budgets: 15 tool calls, 60k tokens, 180 s; `budget_exceeded` outcome with partial report | M | W4 | done early (PR #21) |
 | E3.4 | `correlate_changes` node | M | W4 | todo |
-| E3.5 | Model router (Gemini Flash primary, Groq secondary, per-node override) | S | W4 | todo |
+| E3.5 | Model router (Gemini Flash primary, Groq secondary, per-node override) | S | W4 | done early (PR #21; first real call pending API key) |
 | E3.6 | Similar-incident retrieval in `plan` (depends E6) | S | W10 | todo |
 
 ### E4 — Evidence verification
@@ -813,6 +813,8 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 013 | Ingest accepts OTLP/JSON only | No protobuf dependency; avoids hex-vs-base64 id corruption; single producer we control |
 | 014 | Tail sampling for traces + OTTL metric allowlist in our collector layer | Keep every error trace whole; bound row volume; exact rates via span_metrics on unsampled pipeline |
 | 015 | Liveness probe is `/livez` | Google Frontend reserves `/healthz` on `*.run.app` |
+| 016 | Plan-then-execute tool calling, not a free-form loop | Four model calls per run; deterministic cassette tests; authorization by topology |
+| 017 | Licence policy: deny GPL/AGPL/SSPL, allow LGPL/MPL as unmodified libraries | psycopg (LGPL) is required by the LangGraph checkpointer; weak copyleft does not constrain an Apache-2.0 importer |
 
 ---
 
@@ -851,6 +853,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.11 | 20 Sep 2026 | W2 D2: E2.3 evaluator (`aegisops_api/alerts/`): rules seeded by name from `config/alerts.yaml` (never overwrite DB edits); readers `error_rate` (span_metrics **cumulative counter deltas**, SERVER spans, ≥10 calls), `p95_ratio` (histogram bucket deltas → interpolated p95, vs previous hour), `container_memory_pct`, `kafka_lag`, plus `error_count` (ERROR server spans from the spans table — exact, all error traces are kept) for an `error-burst` rule; window deltas are newest − last sample before the window (new series count from 0, reset-aware); `Evaluator.tick` every **15 s**, breach streaks in memory, `for_windows` = consecutive evaluations, one active incident per service, auto-resolve `open` incidents after 3 healthy ticks. Defaults: error_count ≥ 5 over 60 s ×2; error_rate > 5 % over 120 s ×2 (≥ 5 calls); p95 ratio > 2 over 300 s ×2; memory > 90 % ×3; lag > 1000 ×2. Collector layer: `span_metrics.metrics_flush_interval: 10s` (was 60 s default). Two live drills before the fix measured fault→incident 116 s / 118 s (demo pacing 13–30 s to first payment error at 5 VUs, 60 s flush, new-series delta bug, MIN_CALLS 10); **detection floor = traffic × sample size**, so the W2 criterion is measured from the first error span; E7.2 raises `loadGeneratorVUs` per episode. DB-unreachable errors → 503 problem+json with Retry-After; startup tolerates a missing DB (rule seeding is a warning). Alerts stay in the API package (need the ORM). 61 tests, 97 %. **W2 exit criterion met:** third drill fault → incident **57 s** (first error span → incident 49 s; change event recorded 2 s after the toggle), 0 false positives in warm-up, auto-resolve 2 m 48 s after recovery; cascade opened incidents for payment, checkout and frontend (merging a cascade is the agent's job). |
 | 1.0.12 | 21 Sep 2026 | W1 D7 (a week ahead: W2 core done): E2.2 observation half — `ContainerWatcher` polls the Docker Engine API over the Unix socket (`AEGIS_DOCKER_SOCKET`, httpx `uds=`, no Docker SDK), one Compose project (`AEGIS_DOCKER_COMPOSE_PROJECT`), snapshot per service (image, image id, StartedAt, RestartCount, replicas) every 10 s; diffs → `change_events` type deploy / restart / scale, actor `docker`. E8.4 complete: `uptime.yml` pings `/livez` every 6 h (3 attempts for cold starts), reports `/readyz`; becomes the Supabase keep-alive at E11.5. `httpx` is now a runtime dep of the API. 69 tests, 97 %. Live: `docker restart payment` → restart event in 15 s; `docker kill` exposed that a dead-and-not-restarted container changed nothing we compared → `replicas` now counts running containers (kill = scale 1→0, start = scale 0→1 + restart). Retest: `docker kill currency` at 13:54:58Z → `scale 1 → 0` at 13:55:03Z (5 s); `docker start currency` at 13:55:23Z → `scale 0 → 1` and `restart` events in the same second. |
 | 1.0.13 | 22 Sep 2026 | W3 D1 (W2 by calendar): `packages/tools` is real. Nine §9.1 read tools as async functions over raw SQL + `ToolContext(scenario_id, frozen_now)` (mode-blind, ADR-004); `search_similar_incidents` is an honest empty stub until E6. E9.1: `wrap_untrusted` — JSON in `<telemetry untrusted="true">`, `<`/`>` escaped so the tag cannot be forged from data, 4 KB cap by trimming lists + `truncated: true`. `aegis-telemetry` MCP server (mcp SDK **2.x**: `MCPServer`, not FastMCP) over stdio, input schemas derived from function signatures, mode from env (`AEGIS_SCENARIO_ID`, `AEGIS_FROZEN_NOW`). Lessons: asyncpg needs `CAST(:p AS text)` where a parameter's type is ambiguous; hour-labelled `service_edges` need the query end extended by 1 h; two `tests/` packages collide → tools tests are plain modules; E501 ignored under `tests/`. Live pass caught: span-metrics duration histograms are **ms from most SDKs, s from some** → tools and alert reader normalise per row `unit` (p95 had been 1000× off; the alert *ratio* was unaffected); error traces are now focused depth-first on the error path (30 spans) instead of the first 60 by time; the 4 KB cap trims nested lists; two tests polluted live `change_events` and the retention test's future `now` **wiped all live rows on every `make check`** (now a past cutoff). Also merged Dependabot #18 (ruff 0.16.8) + #19 (pre-commit pin). 85 tests, 96 %. Live, over the demo with `paymentFailure=100%`: all nine tools answered through the MCP server over stdio, every payload inside the envelope and under the cap (largest 2.7 KB: a focused 22-span error trace). frontend p50/p95/p99 = 3.7 / 209.6 / 489.7 ms over 2,041 samples (plausible after the unit fix; 180 s before it). `compare_windows(payment)`: error rate 0.0 → 0.83 across the fault, p95 46 → 7 ms (fast failures). `get_recent_changes` returned the flag flip with before/after and actor. `get_service_dependencies(checkout)` listed six callees with checkout→payment at 3 errors / 5 calls. The same calls with `AEGIS_FROZEN_NOW` set to the drill's end reproduced the numbers: replay-style querying works on live rows. |
+| 1.0.14 | 23 Sep 2026 | W3 D2: `packages/agent` — LangGraph graph triage→plan→investigate→root_cause with conditional jump to root_cause on budget breach; Pydantic schemas for every node (`Triage`, `Hypotheses`≤3, `Findings`, `RootCause` with 12 categories + `partial`); `AsyncPostgresSaver` checkpoints (tables `checkpoint*`, excluded from Alembic via `include_object`); budgets 15/60k/180 s; `Router` over httpx (Gemini `generateContent` JSON mode, Groq json_schema) with per-node override and secondary fallback on 429/5xx (`config/models.yaml`); `RecordedLLM` cassettes; node-scoped tool allowlist (E9.2 first cut); CLI `aegis-investigate` (JSON to stdout, logs to stderr). ADR-016 plan-then-execute. **W3 exit criterion met with a recorded model:** S1 → `dependency_errors` 0.9, 4 model calls, 10 tool calls, 6 checkpoints. First real model run waits on `AEGIS_GEMINI_API_KEY`. Dependency review went red on `psycopg` (LGPL-3.0) → ADR-017: strong copyleft denied, weak copyleft allowed for unmodified libraries. 97 tests, 95 %. |
 
 ---
 

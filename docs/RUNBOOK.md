@@ -76,10 +76,16 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | Schema change needed | New Alembic migration; CI runs it against a fresh DB; deploy runs `alembic upgrade head` as a pre-start step. |
 | Key leaked | Rotate in the provider, update Secret Manager, redeploy, add a note to `SECURITY.md`. |
 
-## Agent (fill in from Week 3)
+## Agent
 
 | Situation | Action |
 |---|---|
+| Run an investigation by hand | `uv run aegis-investigate --service payment --alert "<alert summary>"` (live rows) or add `--scenario <id> --frozen-now <ISO>` for replay. `--recorded packages/agent/tests/cassettes/s1_payment_failure.yaml` needs no model key. Output: one JSON document on stdout; logs on stderr. |
+| `no client for 'gemini:...' (set AEGIS_GEMINI_API_KEY)` | Put the key in `.env` locally / Secret Manager in prod. `config/models.yaml` names providers; both `AEGIS_GEMINI_API_KEY` and `AEGIS_GROQ_API_KEY` should exist so fallback works. |
+| `model_fallback` warnings | Primary returned 429/5xx/timeout; the secondary answered. Frequent fallbacks = quota exhausted; check the provider console. |
+| Run ends with `partial: true` | A budget tripped (`budget_exceeded` says which: tool_calls / tokens / seconds). The report is still valid but lower-confidence. Raise the budget only for benchmarking. |
+| `model output failed ... validation` | The model returned JSON that does not match the schema; retryable, the router falls back once. Persistent → tighten the prompt in `packages/agent/src/aegisops_agent/prompts/`. |
+| Drift test complains about `checkpoint*` tables | They belong to LangGraph's saver, not Alembic; `include_object` in `models/base.py` must skip them. |
 | Gemini 429 / quota exhausted | Router falls back to Groq; if both exhausted, public mode serves cached runs; check Langfuse for the burst source. |
 | Cost spike | Check `runs` for tool_calls/tokens outliers; lower the global daily cap in config; rotate the key if abused. |
 | Checkpoint/resume broken | Inspect `langgraph_*` tables for the thread_id; `POST /incidents/{id}/runs` restarts a fresh thread. |

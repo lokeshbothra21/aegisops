@@ -184,3 +184,18 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Depth-first tree focus | Show error spans, ancestors and children first; fill in tree order | D10 |
 | Destructive test direction | Pick cutoffs so real data can never qualify (past, not future) | D10 |
 | Unit normalisation | Read the `unit` column and convert per series before merging | D10 |
+| Argument filtering | Only a tool's real parameters are forwarded; invented ones are dropped | D11 |
+| Budget wrapper | Counts tool calls/tokens/time; a breach routes to a partial root cause | D11 |
+| Cassette (recorded model) | Canned per-node model outputs replayed in tests and replay demos | D11 |
+| Checkpointer / thread_id | State persisted after each node under a thread; resume and interrupts | D11 |
+| Conditional edge | Graph edge whose target is chosen from state | D11 |
+| `include_object` (Alembic) | Hook to exclude foreign tables (LangGraph's `checkpoint*`) | D11 |
+| JSON mode / response schema | Model asked for schema-conforming JSON; validated with Pydantic | D11 |
+| LangGraph StateGraph | Nodes = functions of state; fixed topology; checkpointed | D11 |
+| Model router / fallback | One place that knows providers; per-node models; secondary on 429/5xx | D11 |
+| Node-scoped tool authorization | Allowlist of tools per node, enforced at execution | D11 |
+| Plan-then-execute | Planner names tools; deterministic execution; one call to interpret (ADR-016) | D11 |
+| Prompt versioning | Prompts as files; version recorded in run state | D11 |
+| Retryable vs non-retryable | 429/5xx/timeout → fallback; 4xx → fail fast | D11 |
+| TypedDict state | LangGraph state as a dict of declared, JSON-serialisable keys | D11 |
+| Weak vs strong copyleft | LGPL/MPL: import freely, share library changes; GPL/AGPL: whole program (and network use) | D11 |

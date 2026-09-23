@@ -1,0 +1,63 @@
+# Recorded model outputs for scenario S1 (paymentFailure). Keys are node names; values are
+# the JSON the model would return, validated against the node's schema at replay time.
+triage:
+  service: payment
+  symptom: error_rate
+  window_minutes: 15
+  summary: payment charge requests are failing at a high rate; checkout errors are downstream
+plan:
+  items:
+    - id: H1
+      statement: A feature flag change on payment (paymentFailure) is making charges fail
+      tools_to_run:
+        - tool: get_recent_changes
+          args: {window_minutes: 30, service: payment}
+        - tool: get_error_traces
+          args: {service: payment, window_minutes: 5, limit: 1}
+    - id: H2
+      statement: payment is slow or saturated (latency regression)
+      tools_to_run:
+        - tool: get_latency_percentiles
+          args: {service: payment, window_minutes: 5}
+        - tool: get_container_metrics
+          args: {service: payment, window_minutes: 5}
+    - id: H3
+      statement: an upstream dependency of payment is down
+      tools_to_run:
+        - tool: get_service_dependencies
+          args: {service: payment, depth: 1}
+investigate:
+  items:
+    - hypothesis_id: H1
+      supports: true
+      evidence_refs:
+        - kind: change
+          ref_id: paymentFailure off -> 100%
+          claim: paymentFailure flag flipped to 100% four minutes before the alert
+        - kind: span
+          ref_id: TRACE_ID_PLACEHOLDER
+          claim: payment Charge span ERROR with exception "Payment request failed. Invalid token."
+      note: the flag flip precedes the errors and the exception matches the flag's behaviour
+    - hypothesis_id: H2
+      supports: false
+      evidence_refs:
+        - kind: metric
+          ref_id: traces.span.metrics.duration
+          claim: p95 latency is 975 ms only because failures are fast; memory flat at ~100 MB
+          claimed_value: 975
+      note: no saturation signal
+    - hypothesis_id: H3
+      supports: false
+      note: payment's only callee is flagd with zero errors
+root_cause:
+  service: payment
+  category: dependency_errors
+  statement: The paymentFailure feature flag was set to 100% at 11:56, making PaymentService/Charge reject every request with "Invalid token"; checkout errors are a consequence. Revert the flag.
+  confidence: 0.9
+  evidence_refs:
+    - kind: change
+      ref_id: paymentFailure off -> 100%
+      claim: flag change 4 minutes before the alert
+    - kind: span
+      ref_id: TRACE_ID_PLACEHOLDER
+      claim: Charge span ERROR "Invalid token"

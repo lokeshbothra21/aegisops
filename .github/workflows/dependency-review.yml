@@ -21,5 +21,7 @@ jobs:
         with:
           fail-on-severity: high
           comment-summary-in-pr: on-failure
-          # Apache-2.0 project: block copyleft that would contaminate the codebase.
-          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, LGPL-3.0, SSPL-1.0
+          # Apache-2.0 project: block STRONG copyleft. Weak copyleft (LGPL, MPL) is allowed for
+          # unmodified library dependencies (ADR-017); psycopg, needed by LangGraph's Postgres
+          # checkpointer, is LGPL-3.0.
+          deny-licenses: GPL-2.0, GPL-3.0, AGPL-3.0, SSPL-1.0

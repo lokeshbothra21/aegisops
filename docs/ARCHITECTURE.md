@@ -42,7 +42,7 @@ flowchart LR
 | Collector layer | `infra/otel-demo/` | OTel Collector config, compose override | Fan out demo telemetry into our pipelines: tail-sampled traces, allowlisted metrics, all logs; export OTLP/JSON to the API | Built (E1.3) |
 | `aegisops-api` | `apps/api/` | Python 3.13, FastAPI, SQLAlchemy 2 async, Alembic, structlog | Ingest, health probes, RFC 7807 errors; later: alerts scheduler, incidents, runs (SSE), approvals, bench results | Built: ingest + probes (E1.1, E1.2, E8.4) |
 | Database | Postgres 17 + pgvector | `pgvector/pgvector:pg17` locally on :5433; Supabase in prod | Single store for telemetry, derived tables, incidents/runs, LangGraph checkpoints, embeddings (ADR-003) | Built: telemetry tables; Supabase pending (E11.5) |
-| `agent` package | `packages/agent/` | LangGraph 1.x, Pydantic v2 | Graph, nodes, schemas, budgets, verifier, model router | Placeholder |
+| `agent` package | `packages/agent/` | LangGraph 1.x, Pydantic v2, httpx | Graph triage→plan→investigate→root_cause, Pydantic outputs, budgets, model router with fallback, cassettes, CLI; verifier/correlate/remediate/approval planned | Built: skeleton (E3.1, E3.2, E3.3, E3.5) |
 | `tools` package | `packages/tools/` | raw SQL + mcp SDK 2.x | Nine read-only telemetry tools (`ToolContext` for live/replay), untrusted envelope, `aegis-telemetry` MCP server over stdio; actions module (not MCP) comes in W6 | Built: tools + server (W3, E9.1) |
 | Jobs + incidents (in the API for now) | `apps/api/.../jobs`, `.../incidents` | asyncio `JobRunner`, SQL | Retention, `service_edges` derivation, flagd change watcher, Docker container watcher (deploy/restart/scale); incident state machine | Built (E1.4, E1.5, E2.1, E2.2-obs, E2.4) |
 | Alerts (in the API) | `apps/api/.../alerts` | SQL readers + `Evaluator` | Rules from `config/alerts.yaml` → `alert_rules`; every 30 s: error_rate / p95_ratio / memory / kafka lag per service → incidents via the state machine | Built (E2.3) |
@@ -70,7 +70,7 @@ Measured on 17 Sep: flag toggle → first ERROR spans in Postgres in 6 s; 15 ser
 
 The agent never knows the mode; the tool layer and the action backend do.
 
-## 6. Agent state machine (planned, W3–W6)
+## 6. Agent state machine (built: triage→plan→investigate→root_cause; planned: the rest, W4–W6)
 
 ```mermaid
 stateDiagram-v2
@@ -132,3 +132,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 | 20 Sep 2026 | Week 2 day 2: alert evaluator (deterministic detection, ADR-008) opens incidents; 503 on DB outage. |
 | 21 Sep 2026 | Container watcher (Docker API) for deploy/restart/scale change events; uptime ping workflow. |
 | 22 Sep 2026 | Tools package: nine read tools, untrusted envelope, MCP server (ADR-007). |
+| 23 Sep 2026 | Agent skeleton: LangGraph graph with checkpoints, structured outputs, budgets, router, cassettes, CLI (ADR-016). |
