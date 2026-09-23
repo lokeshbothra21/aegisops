@@ -102,6 +102,29 @@ class Finding(BaseModel):
 
 class Findings(BaseModel):
     items: list[Finding] = Field(default_factory=list, max_length=3)
+    follow_up: list[ToolRequest] = Field(
+        default_factory=list,
+        max_length=3,
+        description="extra tool calls worth making before concluding (one bounded round)",
+    )
+
+
+class ScoredChange(BaseModel):
+    ts: str
+    type: str
+    service: str | None
+    summary: str = Field(max_length=200)
+    minutes_before_alert: float
+    score: float = Field(ge=0.0, le=1.0)
+
+
+class ChangeCorrelation(BaseModel):
+    """Deterministic (E3.4): change events near the alert, scored by recency and proximity
+    in the dependency graph. temporal_score is the best single score."""
+
+    alert_at: str
+    events: list[ScoredChange] = Field(default_factory=list)
+    temporal_score: float = Field(default=0.0, ge=0.0, le=1.0)
 
 
 class RootCause(BaseModel):
@@ -111,6 +134,25 @@ class RootCause(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0)
     evidence_refs: list[EvidenceRef] = Field(default_factory=list, max_length=10)
     partial: bool = Field(default=False, description="true when produced after a budget breach")
+
+
+class DroppedRef(BaseModel):
+    ref: EvidenceRef
+    reason: str
+
+
+class Verification(BaseModel):
+    cited: int
+    verified: int
+    dropped: list[DroppedRef] = Field(default_factory=list)
+
+
+class VerifiedRootCause(RootCause):
+    """RootCause after `verify_evidence` (E4.1): only verified refs remain, confidence is
+    scaled by verified/cited, and the model's original confidence is kept for the UI."""
+
+    claimed_confidence: float = Field(ge=0.0, le=1.0)
+    verification: Verification
 
 
 class ToolCallRecord(BaseModel):

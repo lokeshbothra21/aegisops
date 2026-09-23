@@ -87,6 +87,8 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | `model_fallback` warnings | Primary returned 429/5xx/timeout; the secondary answered. Frequent fallbacks = quota exhausted; check the provider console. |
 | Run ends with `partial: true` | A budget tripped (`budget_exceeded` says which: tool_calls / tokens / seconds). The report is still valid but lower-confidence. Raise the budget only for benchmarking. |
 | `model output failed ... validation` | The model returned JSON that does not match the schema; retryable, the router falls back once. Persistent → tighten the prompt in `packages/agent/src/aegisops_agent/prompts/`. |
+| Verified confidence much lower than claimed | Read `verification.dropped[].reason`: invented metric names, fabricated ids, numbers off by > 20 %. That is the verifier working; tune prompts in `prompts/` if a pattern repeats (e.g. tell the model the exact metric names the tools expose). |
+| Gemini `503 high demand` / timeouts | Router falls back to Groq per node (`model_fallback` with the exception type). Provider timeout is 30 s. Frequent = check Google AI Studio status; consider swapping primary/secondary in `config/models.yaml` temporarily. |
 | Drift test complains about `checkpoint*` tables | They belong to LangGraph's saver, not Alembic; `include_object` in `models/base.py` must skip them. |
 | Gemini 429 / quota exhausted | Router falls back to Groq; if both exhausted, public mode serves cached runs; check Langfuse for the burst source. |
 | Cost spike | Check `runs` for tool_calls/tokens outliers; lower the global daily cap in config; rotate the key if abused. |

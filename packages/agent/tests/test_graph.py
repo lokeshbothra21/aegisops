@@ -39,13 +39,22 @@ async def test_s1_end_to_end_with_recorded_model(engine: AsyncEngine, scenario: 
         thread_id=f"t-{scenario}",
     )
     assert rc.category is RootCauseCategory.dependency_errors and rc.service == "payment"
-    assert rc.confidence == 0.9 and rc.partial is False
-    # the four nodes ran in order and every tool the plan asked for was executed
+    # the cassette cites one real change and one PLACEHOLDER trace id: the verifier keeps the
+    # change, drops the fabricated span, and halves the model's confidence
+    assert rc.claimed_confidence == 0.9 and rc.confidence == pytest.approx(0.45)
+    assert rc.verification.cited == 2 and rc.verification.verified == 1
+    assert "not a trace id" in rc.verification.dropped[0].reason
+    assert rc.partial is False
+    corr = state["correlation"]
+    assert corr["events"][0]["summary"] == "paymentFailure: off -> 100%"
+    assert corr["temporal_score"] > 0.8
     assert [e["node"] for e in state["events"] if e["type"] == "output"] == [
         "triage",
         "plan",
         "investigate",
+        "correlate_changes",
         "root_cause",
+        "verify_evidence",
     ]
     calls = [c[0] for c in llm.calls]
     assert calls == ["triage", "plan", "investigate", "root_cause"]
@@ -61,10 +70,45 @@ async def test_s1_end_to_end_with_recorded_model(engine: AsyncEngine, scenario: 
         and usage["tool_calls"] == 3 + 2 + 5
         and usage["tokens_in"] == 4 * 800
     )
-    # what the model saw was wrapped as untrusted data
     plan_input = next(u for n, u in llm.calls if n == "plan")
     assert 'untrusted=\\"true\\"' in plan_input or 'untrusted="true"' in plan_input
     assert "paymentFailure" in plan_input  # the flag flip reached the planner
+    rc_input = next(u for n, u in llm.calls if n == "root_cause")
+    assert "change_correlation" in rc_input and "paymentFailure: off -> 100%" in rc_input
+
+
+async def test_follow_up_round_runs_once_and_is_budgeted(
+    engine: AsyncEngine, scenario: str
+) -> None:
+    data = {k: v[0] for k, v in RecordedLLM.from_file(CASSETTE).responses.items()}
+    first = dict(data["investigate"])
+    first["follow_up"] = [
+        {
+            "tool": "compare_windows",
+            "args": {"service": "payment", "after_minutes": 5, "before_minutes": 30},
+        }
+    ]
+    second = dict(data["investigate"])  # no follow_up -> loop ends
+    llm = RecordedLLM(
+        responses={**{k: [v] for k, v in data.items()}, "investigate": [first, second]}
+    )
+    rc, state = await run_investigation(
+        engine=engine,
+        llm=llm,
+        ctx=ToolContext(scenario_id=scenario, frozen_now=NOW),
+        service="payment",
+        alert_summary=ALERT,
+        thread_id=f"t-{scenario}-fu",
+    )
+    inv = [c for c in llm.calls if c[0] == "investigate"]
+    assert len(inv) == 2 and "follow_up_round" in inv[1][1]
+    assert (
+        "follow-up" in state["tool_results"]
+        and state["tool_results"]["follow-up"][0]["tool"] == "compare_windows"
+    )
+    assert state["usage"]["llm_calls"] == 5 and state["usage"]["tool_calls"] == 3 + 2 + 5 + 1
+    assert next(e for e in state["events"] if e["node"] == "investigate")["follow_up_rounds"] == 1
+    assert rc.category is RootCauseCategory.dependency_errors
 
 
 async def test_budget_breach_short_circuits_to_a_partial_root_cause(
@@ -84,6 +128,7 @@ async def test_budget_breach_short_circuits_to_a_partial_root_cause(
     assert rc.partial is True
     nodes = [c[0] for c in llm.calls]
     assert "investigate" not in nodes and nodes[-1] == "root_cause"  # plan's tools tripped the cap
+    assert "verified_root_cause" in state  # the verifier still runs on a partial report
 
 
 async def test_node_scoped_authorization_and_budget_accounting(
@@ -136,5 +181,5 @@ async def test_checkpointer_persists_state_per_thread(engine: AsyncEngine, scena
         tup = await saver.aget_tuple({"configurable": {"thread_id": thread}})
     assert tup is not None
     values = tup.checkpoint["channel_values"]
-    assert values["root_cause"]["category"] == "dependency_errors"
+    assert values["verified_root_cause"]["category"] == "dependency_errors"
     assert values["triage"]["service"] == "payment"

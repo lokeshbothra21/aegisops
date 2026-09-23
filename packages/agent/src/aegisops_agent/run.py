@@ -25,7 +25,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from aegisops_agent.graph import PROMPT_VERSION, AgentState, Deps, build_graph
 from aegisops_agent.llm import LLMClient, RecordedLLM, Router, load_models_config
-from aegisops_agent.schemas import Budget, RootCause
+from aegisops_agent.schemas import Budget, VerifiedRootCause
 from aegisops_agent.tools import ToolRunner
 from aegisops_tools.context import ToolContext
 from aegisops_tools.db import DEFAULT_URL, engine_from_env, session_factory
@@ -49,7 +49,7 @@ async def run_investigation(
     incident_id: int | None = None,
     budget: Budget | None = None,
     checkpointer: AsyncPostgresSaver | None = None,
-) -> tuple[RootCause, AgentState]:
+) -> tuple[VerifiedRootCause, AgentState]:
     budget = budget or Budget()
     tools = ToolRunner(factory=session_factory(engine), ctx=ctx, budget=budget)
     graph = build_graph(Deps(llm=llm, tools=tools, budget=budget), checkpointer=checkpointer)
@@ -66,7 +66,7 @@ async def run_investigation(
         initial, config={"configurable": {"thread_id": thread_id}}
     )
     final["tool_records"] = [r.model_dump() for r in tools.records]  # type: ignore[typeddict-unknown-key]
-    return RootCause.model_validate(final["root_cause"]), final
+    return VerifiedRootCause.model_validate(final["verified_root_cause"]), final
 
 
 def _parse_args(argv: list[str]) -> argparse.Namespace:
@@ -133,6 +133,8 @@ async def _main(argv: list[str]) -> int:
     out: dict[str, Any] = {
         "thread_id": thread_id,
         "root_cause": rc.model_dump(),
+        "claimed_root_cause": final.get("root_cause"),
+        "correlation": final.get("correlation"),
         "usage": final.get("usage"),
         "budget_exceeded": final.get("budget_exceeded"),
         "events": [
