@@ -45,6 +45,8 @@ End to end on the seeded S1 scenario with the recorded model: 4 model calls, 10 
 
 **Alembic `include_object`.** Hook to exclude tables Alembic must not manage; the drift test and autogenerate now skip `checkpoint*`. Found because the checkpointer test created tables and the drift test then wanted to drop them.
 
+**Weak vs strong copyleft (ADR-017).** LGPL/MPL: you may import the library from permissive or proprietary code; only changes to the library itself must be shared. GPL: the whole combined program must be GPL. AGPL: GPL plus network use counts as distribution. Our dependency review denies GPL/AGPL/SSPL and allows LGPL/MPL as unmodified dependencies; `psycopg` (LGPL-3.0), required by LangGraph's checkpointer, triggered the decision.
+
 **Logs to stderr, data to stdout.** A CLI whose stdout is one JSON document composes with pipes; structlog is pointed at stderr.
 
 ## Interview questions
@@ -53,4 +55,5 @@ End to end on the seeded S1 scenario with the recorded model: 4 model calls, 10 
 3. *What happens when the budget runs out mid-investigation?* The state flag routes to `root_cause`, which produces a `partial=true` report with lowered confidence; nothing is lost, and the UI will say so.
 4. *How does provider fallback work and when does it not?* Retryable errors (quota, 5xx, timeout) retry once on the secondary; 4xx client errors fail fast. Logged as `model_fallback` for the cost dashboard.
 5. *Where does the checkpoint live and who owns those tables?* Postgres, same database, tables created by LangGraph's saver; Alembic is told to ignore them.
-6. *How do you keep the model from calling a tool it should not?* Node-scoped allowlist enforced at execution, arguments filtered to the real signature, and denied calls still burn budget.
+6. *A dependency is LGPL and your project is Apache-2.0. Problem?* No, if used unmodified as a library; GPL or AGPL would be. Our CI encodes exactly that line. (ADR-017)
+7. *How do you keep the model from calling a tool it should not?* Node-scoped allowlist enforced at execution, arguments filtered to the real signature, and denied calls still burn budget.

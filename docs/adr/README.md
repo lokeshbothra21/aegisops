@@ -20,3 +20,4 @@ One file per decision that shaped the system. Format: Context (the problem and f
 | [014](ADR-014-tail-sampling-and-metric-allowlist.md) | Tail sampling for traces and an allowlist for metrics in our collector layer |
 | [015](ADR-015-livez-not-healthz.md) | Liveness probe is `/livez` because Google Frontend reserves `/healthz` |
 | [016](ADR-016-plan-then-execute-tool-calling.md) | Plan-then-execute tool calling instead of a free-form tool loop |
+| [017](ADR-017-dependency-licence-policy.md) | Dependency licence policy: strong copyleft denied, weak copyleft (LGPL/MPL) allowed as unmodified libraries |

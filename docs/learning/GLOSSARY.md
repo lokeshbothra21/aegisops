@@ -198,3 +198,4 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Prompt versioning | Prompts as files; version recorded in run state | D11 |
 | Retryable vs non-retryable | 429/5xx/timeout → fallback; 4xx → fail fast | D11 |
 | TypedDict state | LangGraph state as a dict of declared, JSON-serialisable keys | D11 |
+| Weak vs strong copyleft | LGPL/MPL: import freely, share library changes; GPL/AGPL: whole program (and network use) | D11 |
