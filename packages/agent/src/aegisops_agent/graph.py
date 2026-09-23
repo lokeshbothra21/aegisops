@@ -184,11 +184,13 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             results[h.id] = []
             for req in h.tools_to_run:
                 try:
-                    out = await deps.tools.call("investigate", h.id, req.tool, req.args)
+                    out = await deps.tools.call("investigate", h.id, req.tool, req.args.as_kwargs())
                 except BudgetExceededError as exc:
                     breached = exc.what
                     break
-                results[h.id].append({"tool": req.tool, "args": req.args, "result": out})
+                results[h.id].append(
+                    {"tool": req.tool, "args": req.args.as_kwargs(), "result": out}
+                )
             if breached:
                 break
         usage.tool_calls = deps.tools.usage.tool_calls

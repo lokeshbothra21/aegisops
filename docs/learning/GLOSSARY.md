@@ -199,3 +199,6 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Retryable vs non-retryable | 429/5xx/timeout → fallback; 4xx → fail fast | D11 |
 | TypedDict state | LangGraph state as a dict of declared, JSON-serialisable keys | D11 |
 | Weak vs strong copyleft | LGPL/MPL: import freely, share library changes; GPL/AGPL: whole program (and network use) | D11 |
+| Confidently wrong | Valid, high-confidence, incorrect output; structure ≠ truth; verifier's job | D11 |
+| Gemini response-schema subset | Restricted JSON Schema (no $ref/additionalProperties/pattern; nullable not anyOf) | D11 |
+| No data ≠ zero | Tools return null + a note when nothing was found, never 0 | D11 |

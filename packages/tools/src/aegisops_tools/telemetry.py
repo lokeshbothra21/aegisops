@@ -85,6 +85,21 @@ async def get_error_rate(
         await session.execute(_ERRORS_PER_MINUTE_SQL, _p(ctx, start, end, service=service))
     ).all()
     total_f, errors_f = float(total or 0), float(errors or 0)
+    if total_f == 0 and not series:
+        # Absence of data is not "zero traffic": the service may not exist, may be idle, or may
+        # not emit span metrics. Say so, so a model cannot read "0 calls" as an outage.
+        return {
+            "service": service,
+            "window": {"start": _iso(start), "end": _iso(end)},
+            "calls": None,
+            "errors": None,
+            "error_rate": None,
+            "errors_per_minute": [],
+            "note": (
+                f"no span-metrics data for service {service!r} in this window "
+                "(unknown service, idle, or not instrumented)"
+            ),
+        }
     return {
         "service": service,
         "window": {"start": _iso(start), "end": _iso(end)},

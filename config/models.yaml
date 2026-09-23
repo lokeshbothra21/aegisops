@@ -1,6 +1,8 @@
 # Model routing (E3.5, PROJECT.md §8.4). "provider:model". Providers need
 # AEGIS_GEMINI_API_KEY / AEGIS_GROQ_API_KEY in the environment (never in the repo).
-primary: gemini:gemini-2.5-flash
-secondary: groq:llama-3.3-70b-versatile
+# Pinned to exact model ids, not "-latest" aliases, so benchmark results stay reproducible.
+# Checked 23 Sep 2026: gemini-2.5-flash-lite is retired for new keys; Groq no longer serves llama-3.3.
+primary: gemini:gemini-3.5-flash
+secondary: groq:openai/gpt-oss-120b
 nodes:
-  triage: gemini:gemini-2.5-flash-lite   # cheap model for the cheap step
+  triage: gemini:gemini-3.5-flash-lite   # cheap model for the cheap step
