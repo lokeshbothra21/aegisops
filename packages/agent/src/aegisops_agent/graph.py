@@ -23,7 +23,7 @@ from langgraph.types import Checkpointer
 from pydantic import BaseModel
 
 from aegisops_agent.correlate import correlate_changes as _correlate
-from aegisops_agent.llm import LLMClient, LLMResult
+from aegisops_agent.llm import LLMClient, LLMError, LLMResult
 from aegisops_agent.schemas import (
     Budget,
     Findings,
@@ -110,6 +110,30 @@ async def _ask[T: BaseModel](
     return await deps.llm.complete(node, load_prompt(node), json.dumps(user, default=str), schema)
 
 
+class ModelUnavailableError(Exception):
+    """Every provider failed for this node; the run degrades to a partial report."""
+
+
+async def _ask_or_degrade[T: BaseModel](
+    deps: Deps, node: str, user: dict[str, Any], schema: type[T]
+) -> LLMResult[T]:
+    try:
+        return await _ask(deps, node, user, schema)
+    except (LLMError, OSError) as exc:
+        log.warning(
+            "node.llm_unavailable", node=node, error=f"{type(exc).__name__}: {str(exc)[:200]}"
+        )
+        raise ModelUnavailableError(str(exc)[:200]) from exc
+
+
+def _degraded(state: AgentState, node: str, exc: ModelUnavailableError, usage: Usage) -> AgentState:
+    return {
+        "budget_exceeded": "llm_unavailable",
+        "usage": usage.model_dump(),
+        "events": _event(state, node, "llm_unavailable", error=str(exc)),
+    }
+
+
 async def _run_requests(
     deps: Deps, hypothesis_id: str, requests: list[ToolRequest]
 ) -> list[dict[str, Any]] | None:
@@ -145,12 +169,19 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
                 "events": _event(state, "triage", "budget_exceeded", what=exc.what),
             }
         usage.tool_calls = deps.tools.usage.tool_calls
-        result = await _ask(
-            deps,
-            "triage",
-            {"alert": state["alert_summary"], "service": state["service"], "snapshot": snapshot},
-            Triage,
-        )
+        try:
+            result = await _ask_or_degrade(
+                deps,
+                "triage",
+                {
+                    "alert": state["alert_summary"],
+                    "service": state["service"],
+                    "snapshot": snapshot,
+                },
+                Triage,
+            )
+        except ModelUnavailableError as exc:
+            return _degraded(state, "triage", exc, usage)
         _account(usage, result)
         return {
             "triage": result.value.model_dump(),
@@ -184,7 +215,10 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             **context,
             "available_tools": tool_catalogue("investigate"),
         }
-        result = await _ask(deps, "plan", user, Hypotheses)
+        try:
+            result = await _ask_or_degrade(deps, "plan", user, Hypotheses)
+        except ModelUnavailableError as exc:
+            return _degraded(state, "plan", exc, usage)
         _account(usage, result)
         return {
             "hypotheses": result.value.model_dump(),
@@ -218,12 +252,15 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
                 "usage": usage.model_dump(),
                 "events": _event(state, "investigate", "budget_exceeded", what=breached),
             }
-        result = await _ask(
-            deps,
-            "investigate",
-            {"hypotheses": state["hypotheses"], "tool_results": results},
-            Findings,
-        )
+        try:
+            result = await _ask_or_degrade(
+                deps,
+                "investigate",
+                {"hypotheses": state["hypotheses"], "tool_results": results},
+                Findings,
+            )
+        except ModelUnavailableError as exc:
+            return {"tool_results": results, **_degraded(state, "investigate", exc, usage)}
         _account(usage, result)
         # one bounded follow-up round (ADR-016): the model may ask for a few more tools
         rounds = 0
@@ -235,16 +272,19 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
                 breached = "tool_calls"
                 break
             results["follow-up"] = extra
-            result = await _ask(
-                deps,
-                "investigate",
-                {
-                    "hypotheses": state["hypotheses"],
-                    "tool_results": results,
-                    "follow_up_round": rounds,
-                },
-                Findings,
-            )
+            try:
+                result = await _ask_or_degrade(
+                    deps,
+                    "investigate",
+                    {
+                        "hypotheses": state["hypotheses"],
+                        "tool_results": results,
+                        "follow_up_round": rounds,
+                    },
+                    Findings,
+                )
+            except ModelUnavailableError:
+                break  # keep the findings we already have
             _account(usage, result)
         supported = [f.hypothesis_id for f in result.value.items if f.supports]
         return {
@@ -298,7 +338,10 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             rc = RootCause(
                 service=state.get("triage", {}).get("service", state["service"]),
                 category=RootCauseCategory.no_incident,
-                statement=f"investigation could not conclude: {str(exc)[:200]}",
+                statement=(
+                    "investigation could not conclude (model providers unavailable): "
+                    f"{str(exc)[:160]}"
+                ),
                 confidence=0.0,
                 partial=True,
             )

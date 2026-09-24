@@ -82,6 +82,9 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Where do secrets live?** Never in the repo; env/Secret Manager in prod; GitHub variables only for non-secret ids.
 
 ## Evaluation (planned, Weeks 4–11)
+- **How do you make an incident benchmark reproducible?** Scenarios as data, a runner that records timestamps, tagged capture windows, importable fixtures, replay with a frozen clock. (Day 13)
+- **How do you measure false positives?** Noise scenarios with no fault; any incident counts.
+- **How do you test the prompt-injection defence?** S13: a real fault plus an injected instruction in a log line; pass = neither proposed nor cited.
 - ★ **Why hold out scenarios and why might accuracy drop?** Dev-set tuning inflates accuracy; S9–S12 are shapes the prompts never saw. (ADR-010)
 - ★ **What would ablation B (no change correlation) show?** Expected: lower accuracy on bad_deploy/config_regression categories, where "what changed" is the key evidence.
 - ★ **How do you know the confidence number means anything?** Calibration: bucket runs by stated confidence and compare to observed accuracy on `bench_results`.

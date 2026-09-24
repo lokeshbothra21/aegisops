@@ -176,3 +176,61 @@ def test_router_from_env_needs_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     router = Router.from_env(RouteConfig(primary="gemini:flash"))
     with pytest.raises(LLMError, match="AEGIS_GEMINI_API_KEY"):
         router._split("gemini:flash")
+
+
+async def test_router_alternates_providers_with_backoff_and_retry_after() -> None:
+    """Gemini 503, Groq 429 with Retry-After 2, Gemini 503, Groq OK: four attempts, three waits."""
+    calls: list[str] = []
+    waits: list[float] = []
+
+    def gemini_handler(req: httpx.Request) -> httpx.Response:
+        calls.append("gemini")
+        return httpx.Response(503, json={"error": "high demand"})
+
+    def groq_handler(req: httpx.Request) -> httpx.Response:
+        calls.append("groq")
+        if calls.count("groq") == 1:
+            return httpx.Response(429, json={"error": "tpm"}, headers={"retry-after": "2"})
+        return _groq_ok(TRIAGE_JSON)
+
+    async def fake_sleep(s: float) -> None:
+        waits.append(s)
+
+    router = Router(
+        RouteConfig(primary="gemini:flash", secondary="groq:llama"),
+        {
+            "gemini": GeminiClient(
+                api_key="k", http=httpx.AsyncClient(transport=httpx.MockTransport(gemini_handler))
+            ),
+            "groq": GroqClient(
+                api_key="k", http=httpx.AsyncClient(transport=httpx.MockTransport(groq_handler))
+            ),
+        },
+        sleep=fake_sleep,
+    )
+    r = await router.complete("plan", "sys", "user", Triage)
+    assert r.value.service == "payment" and r.fallback is True and router.fallbacks == 1
+    assert calls == ["gemini", "groq", "gemini", "groq"]
+    assert len(waits) == 3 and waits[1] == 2.0 and 1.5 <= waits[0] <= 2.5 and 4.5 <= waits[2] <= 5.5
+
+
+async def test_router_gives_up_after_max_attempts() -> None:
+    from aegisops_agent.llm import MAX_ATTEMPTS
+
+    async def no_sleep(s: float) -> None:
+        pass
+
+    down = httpx.AsyncClient(
+        transport=httpx.MockTransport(lambda r: httpx.Response(503, text="down"))
+    )
+    router = Router(
+        RouteConfig(primary="gemini:flash", secondary="groq:llama"),
+        {
+            "gemini": GeminiClient(api_key="k", http=down),
+            "groq": GroqClient(api_key="k", http=down),
+        },
+        sleep=no_sleep,
+    )
+    with pytest.raises(LLMError, match=f"all {MAX_ATTEMPTS} attempts failed") as e:
+        await router.complete("plan", "sys", "user", Triage)
+    assert e.value.retryable is False

@@ -47,7 +47,7 @@ flowchart LR
 | Jobs + incidents (in the API for now) | `apps/api/.../jobs`, `.../incidents` | asyncio `JobRunner`, SQL | Retention, `service_edges` derivation, flagd change watcher, Docker container watcher (deploy/restart/scale); incident state machine | Built (E1.4, E1.5, E2.1, E2.2-obs, E2.4) |
 | Alerts (in the API) | `apps/api/.../alerts` | SQL readers + `Evaluator` | Rules from `config/alerts.yaml` → `alert_rules`; every 30 s: error_rate / p95_ratio / memory / kafka lag per service → incidents via the state machine | Built (E2.3) |
 | `web` | `apps/web/` (not created) | Next.js 15, TypeScript, Tailwind, shadcn/ui | Incidents list, incident detail with live SSE timeline, Benchmark, Failures | Planned (W5) |
-| `bench` | `bench/` | Python | Scenarios, runner, capture, metrics, report | Planned (W4+) |
+| `bench` | `bench/scenarios.yaml` + `packages/bench/` | Python, httpx | Catalogue (16 scenarios), runner (fault → TTD → hold → revert → capture), fixtures export/import, replay command; metrics + report come in W9 | Built: catalogue, runner, capture, fixtures (E7.1, E7.2, E1.6) |
 | Platform | `.github/workflows/`, `Dockerfile` | GitHub Actions, WIF, Artifact Registry, Cloud Run | CI (lint, types, tests vs Postgres, hooks, docker build), CodeQL, dependency review, Dependabot, keyless deploy with probe-before-traffic | Built (E11.2, E11.3, E11.6, E9.7) |
 
 ## 4. Data flow today (built)
@@ -108,7 +108,7 @@ Every table has `id bigserial` and `created_at`. Planned tables: `runs`, `run_ev
 
 ## 8. API surface
 
-Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `POST /api/v1/admin/{retention,service-edges}/run` (X-Admin-Token). All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
+Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `GET /api/v1/scenarios[/{key}]`, `POST /api/v1/admin/{retention,service-edges}/run`, `POST /api/v1/admin/capture` (X-Admin-Token). All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
 
 ## 9. Deployment and operations
 
@@ -133,3 +133,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 | 21 Sep 2026 | Container watcher (Docker API) for deploy/restart/scale change events; uptime ping workflow. |
 | 22 Sep 2026 | Tools package: nine read tools, untrusted envelope, MCP server (ADR-007). |
 | 23 Sep 2026 | Agent skeleton: LangGraph graph with checkpoints, structured outputs, budgets, router, cassettes, CLI (ADR-016). Same day: evidence verifier, change correlation, follow-up round; first real model runs. |
+| 24 Sep 2026 | Scenario catalogue, runner, capture (`scenarios` table, migration 0004), fixtures, replay command. |

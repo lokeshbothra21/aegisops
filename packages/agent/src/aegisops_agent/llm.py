@@ -11,9 +11,11 @@ outputs for tests and CI (the plan's "cassettes").
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
-from collections.abc import Callable
+import random
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, TypeVar
@@ -40,9 +42,21 @@ class LLMResult[T: BaseModel]:
 
 
 class LLMError(Exception):
-    def __init__(self, message: str, *, retryable: bool) -> None:
+    def __init__(
+        self, message: str, *, retryable: bool, retry_after_s: float | None = None
+    ) -> None:
         super().__init__(message)
         self.retryable = retryable
+        self.retry_after_s = retry_after_s
+
+
+def _retry_after(r: httpx.Response) -> float | None:
+    """Seconds the provider asks us to wait (Retry-After header), capped at 60."""
+    raw = r.headers.get("retry-after")
+    try:
+        return min(float(raw), 60.0) if raw else None
+    except ValueError:
+        return None
 
 
 class LLMClient(Protocol):
@@ -141,6 +155,7 @@ class GeminiClient:
             raise LLMError(
                 f"gemini {r.status_code}: {r.text[:200]}",
                 retryable=r.status_code in (429, 500, 502, 503, 504),
+                retry_after_s=_retry_after(r),
             )
         data = r.json()
         text = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -182,6 +197,7 @@ class GroqClient:
             raise LLMError(
                 f"groq {r.status_code}: {r.text[:200]}",
                 retryable=r.status_code in (429, 500, 502, 503, 504),
+                retry_after_s=_retry_after(r),
             )
         data = r.json()
         text = data["choices"][0]["message"]["content"]
@@ -211,13 +227,19 @@ def load_models_config(path: str | Path) -> RouteConfig:
         return RouteConfig.model_validate(yaml.safe_load(f))
 
 
+MAX_ATTEMPTS = 4
+BACKOFF_BASE_S = 1.5
+
+
 @dataclass
 class Router:
-    """Chooses provider+model per node; retries once on the secondary if the primary is down."""
+    """Chooses provider+model per node; alternates providers with backoff when one is down."""
 
     config: RouteConfig
     providers: dict[str, Provider]
     on_fallback: Callable[[str, str], None] | None = None
+    sleep: Callable[[float], Awaitable[None]] = asyncio.sleep
+    fallbacks: int = 0
 
     @classmethod
     def from_env(cls, config: RouteConfig) -> Router:
@@ -239,26 +261,45 @@ class Router:
     async def complete[T: BaseModel](
         self, node: str, system: str, user: str, schema: type[T]
     ) -> LLMResult[T]:
+        """Up to MAX_ATTEMPTS calls alternating primary/secondary (PROJECT.md §8.3: retries with
+        jittered backoff; switch provider on 429/5xx). A provider's Retry-After is honoured
+        (capped at 60 s) and a non-retryable error stops immediately."""
         primary = self.config.nodes.get(node, self.config.primary)
-        provider, model = self._split(primary)
-        try:
-            return await self.providers[provider].complete(model, system, user, schema)
-        except (LLMError, httpx.HTTPError) as exc:
-            retryable = getattr(exc, "retryable", True)
-            if not retryable or not self.config.secondary:
-                raise
-            log.warning(
-                "model_fallback",
-                node=node,
-                **{"from": primary, "to": self.config.secondary},
-                error=f"{type(exc).__name__}: {str(exc)[:200]}",
-            )
-            if self.on_fallback:
-                self.on_fallback(node, self.config.secondary)
-            provider2, model2 = self._split(self.config.secondary)
-            result = await self.providers[provider2].complete(model2, system, user, schema)
-            result.fallback = True
+        order = [primary] + ([self.config.secondary] if self.config.secondary else [])
+        last: Exception | None = None
+        for attempt in range(MAX_ATTEMPTS):
+            spec = order[attempt % len(order)]
+            provider, model = self._split(spec)
+            try:
+                result = await self.providers[provider].complete(model, system, user, schema)
+            except (LLMError, httpx.HTTPError) as exc:
+                last = exc
+                if not getattr(exc, "retryable", True):
+                    raise
+                if attempt == MAX_ATTEMPTS - 1:
+                    break
+                nxt = order[(attempt + 1) % len(order)]
+                jitter = random.uniform(0, 1)  # noqa: S311 - backoff jitter, not security
+                wait = getattr(exc, "retry_after_s", None) or (
+                    BACKOFF_BASE_S * (attempt + 1) + jitter
+                )
+                log.warning(
+                    "model_fallback",
+                    node=node,
+                    attempt=attempt + 1,
+                    **{"from": spec, "to": nxt},
+                    wait_s=round(wait, 1),
+                    error=f"{type(exc).__name__}: {str(exc)[:200]}",
+                )
+                if self.on_fallback:
+                    self.on_fallback(node, nxt)
+                await self.sleep(wait)
+                continue
+            result.fallback = spec != primary
+            if result.fallback:
+                self.fallbacks += 1
             return result
+        raise LLMError(f"all {MAX_ATTEMPTS} attempts failed for {node}: {last}", retryable=False)
 
 
 # --- recorded (cassettes) ------------------------------------------------------------

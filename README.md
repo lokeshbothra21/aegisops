@@ -13,7 +13,7 @@
 - **Correlates what changed**: flag flips, deploys, restarts and scale events are recorded as they happen and scored by recency and dependency proximity.
 - **Verifies before it speaks**: every cited trace, log, metric or change is checked against the store; numbers must be within ±20 %; unverifiable citations are dropped and confidence is scaled down. On its first real run the model claimed 0.86 with an invented metric name; the verifier returned 0.57 and said why.
 - **Stays inside budgets**: 15 tool calls, 60k tokens, 180 s per run; a breach still produces a partial report.
-- **Runs the same code live and in replay**: captured scenarios replay deterministically for the public demo, CI and the benchmark.
+- **Runs the same code live and in replay**: `aegis-scenario run S1` injects a fault, measures time-to-detect, reverts and captures the window; `aegis-scenario investigate S1` replays the agent on it with the clock frozen.
 
 **Deliberately not in v1:** writing or merging code patches, Kubernetes, canary deploys, Slack/PagerDuty integrations, multi-tenancy, model fine-tuning.
 
@@ -92,7 +92,16 @@ uv run aegis-telemetry                         # the read tools as an MCP server
 make check                                     # lint, types, 109 tests against Postgres (same as CI)
 ```
 
-`make bench` arrives in Week 9.
+Run a scenario end to end and replay it:
+
+```bash
+uv run aegis-scenario list                     # S1–S8 dev, S9–S12 held-out, N1–N3 noise, S13 injection
+uv run aegis-scenario run S1 --admin-token $AEGIS_ADMIN_TOKEN   # fault → incident (TTD) → revert → capture
+uv run aegis-scenario investigate S1           # replay the agent on the captured window, clock frozen
+uv run aegis-scenario export S1                # bench/fixtures/S1.jsonl.gz for CI / the public demo
+```
+
+`make bench` (all scenarios × variants × models, scored) arrives in Week 9.
 
 ## At 10K services and 1,000 incidents a day
 
@@ -109,6 +118,7 @@ Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 +
 | `apps/api/` | FastAPI service: ingest, health, incidents API, jobs (retention, service edges, flag & container watchers), alert evaluator |
 | `packages/tools/` | Nine read tools, untrusted envelope, `aegis-telemetry` MCP server |
 | `packages/agent/` | LangGraph graph, schemas, verifier, change correlation, model router, cassettes, `aegis-investigate` CLI |
+| `packages/bench/` · `bench/scenarios.yaml` | Scenario catalogue, runner, capture, fixtures, `aegis-scenario` CLI |
 | `infra/otel-demo/` | Collector layer and compose override for the pinned demo |
 | `config/` | Alert rules, model routing, target-specific names |
 | `docs/PROJECT.md` | The master plan: requirements, schedule, changelog |

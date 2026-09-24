@@ -7,12 +7,13 @@ requires-python = ">=3.13,<3.14"
 license = "Apache-2.0"
 
 [tool.uv.workspace]
-members = ["apps/api", "packages/agent", "packages/tools", "packages/alerts"]
+members = ["apps/api", "packages/agent", "packages/tools", "packages/alerts", "packages/bench"]
 
 [tool.uv.sources]
 aegisops-agent = { workspace = true }
 aegisops-tools = { workspace = true }
 aegisops-alerts = { workspace = true }
+aegisops-bench = { workspace = true }
 
 [dependency-groups]
 dev = [
@@ -37,14 +38,14 @@ select = ["E", "F", "I", "B", "UP", "S", "N", "ASYNC", "RUF"]
 ignore = ["S101"]  # assert is fine in tests
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S105", "S106", "E501"]  # fixtures with long SQL/JSON literals
+"**/tests/**" = ["S105", "S106", "E501", "S608"]  # fixtures with long SQL/JSON literals
 "packages/tools/src/aegisops_tools/testing.py" = ["E501"]  # shared SQL fixtures
 
 [tool.mypy]
 python_version = "3.13"
 strict = true
 plugins = ["pydantic.mypy"]
-mypy_path = "apps/api/src:packages/agent/src:packages/tools/src:packages/alerts/src"
+mypy_path = "apps/api/src:packages/agent/src:packages/tools/src:packages/alerts/src:packages/bench/src"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -52,4 +53,4 @@ testpaths = ["apps/api/tests", "packages/*/tests"]
 addopts = "-q --strict-markers"
 
 [tool.coverage.run]
-source = ["aegisops_api", "aegisops_agent", "aegisops_tools", "aegisops_alerts"]
+source = ["aegisops_api", "aegisops_agent", "aegisops_tools", "aegisops_alerts", "aegisops_bench"]

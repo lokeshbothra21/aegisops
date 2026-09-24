@@ -183,3 +183,34 @@ async def test_checkpointer_persists_state_per_thread(engine: AsyncEngine, scena
     values = tup.checkpoint["channel_values"]
     assert values["verified_root_cause"]["category"] == "dependency_errors"
     assert values["triage"]["service"] == "payment"
+
+
+async def test_model_outage_degrades_to_a_partial_report(
+    engine: AsyncEngine, scenario: str
+) -> None:
+    """Every provider down from the plan node on: the run still ends with a verified partial report."""
+    from aegisops_agent.llm import LLMError
+
+    class FlakyLLM(RecordedLLM):
+        async def complete(self, node, system, user, schema):  # type: ignore[no-untyped-def]
+            if node != "triage":
+                raise LLMError(f"all attempts failed for {node}", retryable=False)
+            return await super().complete(node, system, user, schema)
+
+    llm = FlakyLLM.from_file(CASSETTE)
+    rc, state = await run_investigation(
+        engine=engine,
+        llm=llm,
+        ctx=ToolContext(scenario_id=scenario, frozen_now=NOW),
+        service="payment",
+        alert_summary=ALERT,
+        thread_id=f"t-{scenario}-outage",
+    )
+    assert state["budget_exceeded"] == "llm_unavailable"
+    assert (
+        rc.partial is True and rc.confidence == 0.0 and rc.category is RootCauseCategory.no_incident
+    )
+    assert "model providers unavailable" in rc.statement
+    kinds = [(e["node"], e["type"]) for e in state["events"]]
+    assert ("plan", "llm_unavailable") in kinds and ("root_cause", "failed") in kinds
+    assert kinds[-1] == ("verify_evidence", "output")  # the verifier still ran
