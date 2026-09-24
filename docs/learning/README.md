@@ -24,3 +24,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [10](day-10-2026-09-22-telemetry-tools-mcp.md) | 22 Sep | Nine read-only telemetry tools, untrusted envelope, `aegis-telemetry` MCP server | #20 |
 | [11](day-11-2026-09-23-agent-skeleton.md) | 23 Sep | LangGraph skeleton, structured outputs, budgets, model router, cassettes, CLI | #21 |
 | [12](day-12-2026-09-23-verifier-correlation.md) | 23 Sep | Evidence verifier (100 %), change correlation, follow-up round, real run 0.86 → 0.57 | #23 |
+| [13](day-13-2026-09-24-scenarios-runner-capture.md) | 24 Sep | Scenario catalogue, runner, capture, fixtures, replay command | #26 |

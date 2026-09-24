@@ -210,3 +210,15 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Temporal correlation | recency × proximity score for change events near the alert | D12 |
 | Tolerance band | ±20 % relative + 0.01 absolute for numeric claims | D12 |
 | Window ambiguity | Recompute a cited number over standard windows; accept any match | D12 |
+| Capture window / tagging | Set `scenario_id` on rows in a window; retention-proof; serves live and replay | D13 |
+| Dev vs held-out split | Tune on S1–S8; run S9–S12 once at the end | D13 |
+| Fixture (scenario) | gzip JSONL snapshot of a captured scenario, importable anywhere | D13 |
+| Injectable clock | `now()`/`sleep()` as parameters so tests use virtual time | D13 |
+| Injection scenario (S13) | Real fault + instruction-like log line; must be neither followed nor cited | D13 |
+| Noise scenario | No fault applied; any incident is a false positive | D13 |
+| Scenario / episode | Fault definition with expected outcomes / one execution of it | D13 |
+| Time-to-detect (TTD) | Fault applied → incident opened | D13 |
+| Degrade, don't crash | Model outage → flag + partial verified report, never a traceback | D13 |
+| Docker context | Which daemon the CLI targets; an empty daemon looks like data loss | D13 |
+| Replay clock | The frozen "now" for replay: the expected service's first incident | D13 |
+| Retry-After | Provider header telling the client when to retry; honoured, capped at 60 s | D13 |

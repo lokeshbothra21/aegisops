@@ -6,6 +6,7 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 
 | Situation | Action |
 |---|---|
+| `docker ps` shows nothing, no volumes, "everything is gone" | Check `docker context ls` first: Docker Desktop registers its own empty daemon and can take over the CLI context. `docker context use orbstack` brings every container and volume back. Nothing was deleted. |
 | `make test` fails with connection refused on 5433 | Docker (OrbStack) is not running or the container is down. `open -a OrbStack`, then `make db-up`. Data persists in the `aegis-pgdata` volume. |
 | `test_migrated_schema_matches_models` fails | Models and migrations drifted. `make db-revision m="describe change"`, inspect the generated file, `make db-migrate`. Never edit an applied migration. |
 | Demo (compose) won't start on 16 GB | Close apps, `make demo-up` (minimal profile), verify arm64 images, `docker system prune`. Minimal mode measured ~2.5 GB (OpenSearch alone 1 GB). |
@@ -39,6 +40,18 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 | Uptime workflow red | Open the run: `/livez` failed 3× 10 s apart. Check Cloud Run revisions/logs (Deploy section). A single red run after a deploy can be a cold start racing the deploy; two in a row is an outage. |
 | A job logs `job.ok` but nothing is in the DB | Fixed 19 Sep (runner commit bug). If it recurs: the job must not `return` from inside a session block that is a bare async generator; use `async with session_scope(...)`. |
 | Job failing every tick (`job.failed` in logs) | The runner never stops on errors; read the `error=` field, fix, restart. Each tick is its own transaction, so a failure leaves no partial rows. |
+
+## Scenarios and replay
+
+| Situation | Action |
+|---|---|
+| Run a scenario end to end | Demo + API up, then `uv run aegis-scenario run S1 --admin-token $AEGIS_ADMIN_TOKEN` (needs `AEGIS_FLAGD_CONFIG_PATH`). Prints a `RunReport` (fault_at, incident_at, ttd_s, captured counts). Exit 1 = no incident opened within the timeout. |
+| The demo is left broken after a failed run | The runner reverts the fault in `finally`; if the process was killed, `make flag name=<flag> variant=off` (see `bench/scenarios.yaml` for the revert variant, e.g. `loadGeneratorVUs` → `5`). |
+| Re-capture a scenario with a different window | `POST /api/v1/admin/capture` with the same key: old tags are released first. Windows must not overlap other scenarios. |
+| Share a captured scenario / seed CI or Supabase | `aegis-scenario export S1` → `bench/fixtures/S1.jsonl.gz` (gitignored, publish as a release asset); `aegis-scenario import <file>` elsewhere. |
+| Replay gives a strange answer ("no telemetry", revert blamed) | Check the frozen clock: `aegis-scenario investigate` uses the expected service's first incident time. If the scenario has no incident for that service, it falls back to the window end, which is after the revert. |
+| Replay the agent on a captured scenario | `aegis-scenario investigate S1 [--recorded cassette.yaml]` = `aegis-investigate --scenario S1 --frozen-now <window_end>`. |
+| `not captured` from investigate | `GET /api/v1/scenarios` must list the key; run or import it first. |
 
 ## Alerting
 
@@ -88,6 +101,7 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | Run ends with `partial: true` | A budget tripped (`budget_exceeded` says which: tool_calls / tokens / seconds). The report is still valid but lower-confidence. Raise the budget only for benchmarking. |
 | `model output failed ... validation` | The model returned JSON that does not match the schema; retryable, the router falls back once. Persistent → tighten the prompt in `packages/agent/src/aegisops_agent/prompts/`. |
 | Verified confidence much lower than claimed | Read `verification.dropped[].reason`: invented metric names, fabricated ids, numbers off by > 20 %. That is the verifier working; tune prompts in `prompts/` if a pattern repeats (e.g. tell the model the exact metric names the tools expose). |
+| Groq `429 ... tokens per minute (TPM): Limit 8000` | Free tier: one ~7k-token prompt per minute. The router honours `Retry-After` and alternates providers (4 attempts); a run with both providers down degrades to a partial report. For sustained runs use Gemini as primary and expect fallbacks, or upgrade the Groq tier. |
 | Gemini `503 high demand` / timeouts | Router falls back to Groq per node (`model_fallback` with the exception type). Provider timeout is 30 s. Frequent = check Google AI Studio status; consider swapping primary/secondary in `config/models.yaml` temporarily. |
 | Drift test complains about `checkpoint*` tables | They belong to LangGraph's saver, not Alembic; `include_object` in `models/base.py` must skip them. |
 | Gemini 429 / quota exhausted | Router falls back to Groq; if both exhausted, public mode serves cached runs; check Langfuse for the burst source. |

@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help install lint format typecheck test check api db-up db-down db-migrate db-revision demo-check demo-up demo-down demo-config demo-logs flag clean
+.PHONY: help install lint format typecheck test check api db-up db-down db-migrate db-revision demo-check demo-up demo-down demo-config demo-logs scenario flag clean
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -70,6 +70,10 @@ demo-config: ## Print the merged compose config (debugging overrides)
 
 demo-logs: ## Tail the collector's logs (export errors show here)
 	docker logs -f --since 2m otel-collector
+
+scenario: ## Run a scenario end to end: make scenario key=S1   (demo + API must be up)
+	@test -n "$(key)" || { echo "usage: make scenario key=S1"; exit 1; }
+	uv run aegis-scenario run $(key) --admin-token "$${AEGIS_ADMIN_TOKEN:-change-me-local-only}" --flagd $(DEMO_DIR)/src/flagd/demo.flagd.json
 
 flag: ## Set a demo feature flag: make flag name=paymentFailure variant=100%   (variant=off to clear)
 	@test -n "$(name)" -a -n "$(variant)" || { echo "usage: make flag name=<flag> variant=<variant>"; exit 1; }

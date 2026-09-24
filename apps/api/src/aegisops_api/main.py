@@ -22,7 +22,7 @@ from aegisops_api.jobs.retention import run_retention
 from aegisops_api.jobs.runner import Job, JobRunner
 from aegisops_api.jobs.service_edges import derive_recent_hours
 from aegisops_api.logging import configure_logging
-from aegisops_api.routes import admin, health, incidents, ingest
+from aegisops_api.routes import admin, health, incidents, ingest, scenarios
 from aegisops_api.settings import Settings, get_settings
 from aegisops_api.targets import load_target
 
@@ -120,6 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(ingest.router)
     app.include_router(admin.router)
     app.include_router(incidents.router)
+    app.include_router(scenarios.router)
     return app
 
 
