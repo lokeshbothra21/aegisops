@@ -18,7 +18,8 @@ from aegisops_api.models import Incident, IncidentStatus
 S = IncidentStatus
 ALLOWED: dict[IncidentStatus, frozenset[IncidentStatus]] = {
     S.open: frozenset({S.investigating, S.resolved, S.failed}),
-    S.investigating: frozenset({S.awaiting_approval, S.resolved, S.failed}),
+    # investigating -> remediating directly when policy auto-approves (no human wait)
+    S.investigating: frozenset({S.awaiting_approval, S.remediating, S.resolved, S.failed}),
     # rejected proposal -> back to investigating (a human takes over or a new run starts)
     S.awaiting_approval: frozenset({S.remediating, S.investigating, S.resolved, S.failed}),
     S.remediating: frozenset({S.resolved, S.failed}),

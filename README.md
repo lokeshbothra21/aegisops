@@ -13,6 +13,7 @@
 - **Correlates what changed**: flag flips, deploys, restarts and scale events are recorded as they happen and scored by recency and dependency proximity.
 - **Verifies before it speaks**: every cited trace, log, metric or change is checked against the store; numbers must be within ±20 %; unverifiable citations are dropped and confidence is scaled down. On its first real run the model claimed 0.86 with an invented metric name; the verifier returned 0.57 and said why.
 - **Asks before it acts**: every investigation is a run with a live event stream; the agent proposes one of four fixes and pauses; a human approves or rejects over the API, and the policy decides when low-risk, high-confidence fixes may skip the human. Measured live: $0.004 per run at list prices.
+- **Acts only after approval, and checks its work**: the approved fix runs through allowlisted, shell-free actions (flag revert, container restart); 90 s later the triggering rule is re-checked over post-fix data and the incident is resolved or marked failed. Every tool call, decision and action is audited.
 - **Stays inside budgets**: 15 tool calls, 60k tokens, 180 s per run; a breach still produces a partial report.
 - **Runs the same code live and in replay**: `aegis-scenario run S1` injects a fault, measures time-to-detect, reverts and captures the window; `aegis-scenario investigate S1` replays the agent on it with the clock frozen.
 
@@ -92,7 +93,7 @@ uv run aegis-investigate ... --recorded packages/agent/tests/cassettes/s1_paymen
 uv run aegis-telemetry                         # the read tools as an MCP server (stdio)
 curl -X POST localhost:8000/api/v1/incidents/<id>/runs -d '{}' -H 'content-type: application/json'   # start a run
 curl -N localhost:8000/api/v1/runs/<run>/events   # live SSE stream; approve with POST /runs/<run>/approve
-make check                                     # lint, types, 141 tests against Postgres (same as CI)
+make check                                     # lint, types, 164 tests against Postgres (same as CI)
 ```
 
 Run a scenario end to end and replay it:
@@ -112,7 +113,7 @@ Shard ingest by service and sample harder at the collector; keep the span-metric
 
 ## Tech stack
 
-Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (141 tests, 94 %) · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
+Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (164 tests) · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
 
 ## Repository map
 

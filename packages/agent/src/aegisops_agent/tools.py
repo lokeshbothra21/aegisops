@@ -9,12 +9,15 @@ from __future__ import annotations
 
 import inspect
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aegisops_agent.schemas import Budget, ToolCallRecord, Usage
+
+if TYPE_CHECKING:
+    from aegisops_agent.actions import AuditWriter
 from aegisops_tools import telemetry
 from aegisops_tools.context import ToolContext
 from aegisops_tools.untrusted import wrap_untrusted
@@ -57,6 +60,8 @@ class ToolRunner:
     budget: Budget = field(default_factory=Budget)
     usage: Usage = field(default_factory=Usage)
     records: list[ToolCallRecord] = field(default_factory=list)
+    audit: AuditWriter | None = None  # E9.6: every tool call, allowed or denied
+    run_id: int | None = None
 
     async def call(self, node: str, hypothesis_id: str, tool: str, args: dict[str, Any]) -> str:
         """Run one tool for `node`; returns the untrusted envelope or an error envelope.
@@ -68,19 +73,21 @@ class ToolRunner:
             raise BudgetExceededError("tool_calls")
         self.usage.tool_calls += 1
         if tool not in NODE_TOOLS.get(node, frozenset()):
-            return self._fail(
-                hypothesis_id, tool, args, f"tool {tool!r} is not available to node {node!r}"
+            return await self._fail(
+                node, hypothesis_id, tool, args, f"tool {tool!r} is not available to node {node!r}"
             )
         fn = telemetry.TOOLS.get(tool)
         if fn is None:
-            return self._fail(hypothesis_id, tool, args, f"unknown tool {tool!r}")
+            return await self._fail(node, hypothesis_id, tool, args, f"unknown tool {tool!r}")
         allowed = set(list(inspect.signature(fn).parameters)[2:])
         clean = {k: v for k, v in args.items() if k in allowed}
         try:
             async with self.factory() as session:
                 payload = await fn(session, self.ctx, **clean)
         except Exception as exc:
-            return self._fail(hypothesis_id, tool, clean, f"{type(exc).__name__}: {str(exc)[:200]}")
+            return await self._fail(
+                node, hypothesis_id, tool, clean, f"{type(exc).__name__}: {str(exc)[:200]}"
+            )
         out = wrap_untrusted(payload)
         self.records.append(
             ToolCallRecord(
@@ -88,13 +95,23 @@ class ToolRunner:
             )
         )
         log.info("tool.ok", node=node, tool=tool, bytes=len(out))
+        await self._audit(node, tool, clean, ok=True)
         return out
 
-    def _fail(self, hypothesis_id: str, tool: str, args: dict[str, Any], error: str) -> str:
+    async def _audit(self, node: str, tool: str, args: dict[str, Any], *, ok: bool) -> None:
+        if self.audit is not None:
+            await self.audit.write(
+                run_id=self.run_id, node=node, tool=tool, args=args, ok=ok, actor="agent"
+            )
+
+    async def _fail(
+        self, node: str, hypothesis_id: str, tool: str, args: dict[str, Any], error: str
+    ) -> str:
         self.records.append(
             ToolCallRecord(
                 hypothesis_id=hypothesis_id, tool=tool, args=args, ok=False, bytes=0, error=error
             )
         )
         log.warning("tool.failed", tool=tool, error=error)
+        await self._audit(node, tool, {**args, "error": error[:200]}, ok=False)
         return wrap_untrusted({"error": error})

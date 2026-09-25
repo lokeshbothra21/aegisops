@@ -4,7 +4,7 @@
 
 | Field | Value |
 |---|---|
-| Document version | 1.0.17 |
+| Document version | 1.0.18 |
 | Status | **Active** |
 | Owner | Lokesh |
 | Created | 13 Sep 2026 |
@@ -174,9 +174,9 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 |---|---|---|---|---|
 | E5.1 | Category → action mapping + risk tiers | M | W6 | done early (PR #27, + flag-revert override) |
 | E5.2 | `approval` interrupt node; Approve/Reject API + UI | M | W5 | API done (PR #27); UI with E10.2 |
-| E5.3 | Actions module: toggle_flag, restart_service, scale_service, rollback_deployment (compose/flagd backends) | M | W6 | todo |
+| E5.3 | Actions module: toggle_flag, restart_service, scale_service, rollback_deployment (compose/flagd backends) | M | W6 | done (PR #28; live: flag + restart; scale/rollback unsupported by the demo) |
 | E5.4 | Policy YAML + evaluator (autonomy level × risk × confidence) | M | W6 | first cut (PR #27); enforcement at execute in W6 |
-| E5.5 | Post-action verification (re-evaluate alert after 90 s) | M | W6 | todo |
+| E5.5 | Post-action verification (re-evaluate alert after 90 s) | M | W6 | done (PR #28; post-action window only) |
 | E5.6 | Replay backend for actions (returns recorded outcome) | M | W7 | todo |
 
 ### E6 — Incident memory
@@ -209,11 +209,11 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
 | E9.1 | Untrusted-content wrapping of all tool outputs | M | W3 | done (PR #20) |
-| E9.2 | Node-scoped tool authorization + graph-structure test | M | W6 | todo |
-| E9.3 | Action allowlist + param validation | M | W6 | todo |
+| E9.2 | Node-scoped tool authorization + graph-structure test | M | W6 | done (PR #28; structure test + node re-check) |
+| E9.3 | Action allowlist + param validation | M | W6 | done (PR #28) |
 | E9.4 | Admin token, per-IP concurrency, global daily cap, cached-run fallback | M | W7 | todo |
 | E9.5 | S13 prompt-injection scenario test | M | W10 | todo |
-| E9.6 | Audit log | M | W6 | todo |
+| E9.6 | Audit log | M | W6 | done (PR #28) |
 | E9.7 | CodeQL, dependency review, secret scanning enabled | M | W1 | done (PR #7) |
 
 ### E10 — UI
@@ -857,6 +857,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.15 | 23 Sep 2026 | W3 D2 (3rd PR): E4.1 `verify_evidence` — span/log/metric/change refs checked against the store; numeric claims ±20 % (abs 0.01) against any standard window (5/15/30/60 m); change refs by timestamp ±60 s or identifying token; unverifiable refs dropped with reasons; `confidence = claimed × verified/cited`, `claimed_confidence` kept. E4.2 adversarial tests, verifier 100 % lines. E3.4 `correlate_changes` deterministic: recency × proximity (service 1.0 / neighbour 0.7 / other 0.3; post-alert × 0.3) over ±30 min, fed to `root_cause` as data (no summarising LLM call). Bounded follow-up round in `investigate` (≤ 3 tool requests, once). Graph: 6 nodes. Provider timeout 60 → 30 s after two timeouts pushed a run to 183 s. **Real run:** claimed `config_regression` 0.86 citing the flag change (correlation 0.867 — the model now cites it), a log signature and an invented metric `payment_error_rate` → dropped → verified 0.573 (2/3). 109 tests, 95 %. README rewritten as a living document in the §18.1 shape (PR #24), updated per PR from now on. |
 | 1.0.16 | 24 Sep 2026 | W3 D3: `packages/bench` — E7.1 catalogue (`bench/scenarios.yaml`, typed by Pydantic: dev S1–S8, held-out S9–S12 as unbuilt overlays, noise N1–N3, security S13 with an injected log line ingested via OTLP); E7.2 runner `aegis-scenario run <key>` (warm-up, fault, poll incidents for TTD, hold, revert in `finally`, wait for auto-resolve, capture); E1.6 capture `POST /api/v1/admin/capture` tags six tables in the window + upserts `scenarios` (migration `0004`), `GET /api/v1/scenarios[/{key}]`; fixtures `export`/`import` as gzip JSONL (timestamps/JSONB coerced for asyncpg); `aegis-scenario investigate <key>` replays with frozen now = window_end. Lesson: deadlines on the injectable clock, not `time.monotonic()` (a test spun 3.5 real minutes). **Live S1 via the runner:** TTD 69.3 s, captured 4,870 spans / 8,740 logs / 18,282 points / 2 changes / 4 incidents (one false positive: flagd-ui memory 90.14 % during warm-up), fixture 2.0 MB. Replay with the clock at payment's incident: `config_regression` 0.98, 2/2 citations verified, correlation 0.962 for the fault vs 0.27 for the later revert, 75 s. Fixed on the way: capture now derives `service_edges` for its window; router does 4 alternating attempts with jittered backoff + `Retry-After` (Gemini 503 + Groq 8k TPM had crashed a run); nodes degrade to a partial report when every provider fails; replay clock = expected service's first incident (window end ranked the revert first; any-service picked a pre-fault false positive). Ops lesson: Docker Desktop started and stole the CLI context — nothing was lost, `docker context use orbstack`. 123 tests, 93 %. |
 | 1.0.17 | 25 Sep 2026 | W3 D4: migration `0005` (`runs`, `run_events`, `remediations`); `RunManager` drives the graph in-process step by step (ADR-009); `POST /incidents/{id}/runs` (202, one active run), `GET /runs/{id}`, `GET /runs/{id}/events` SSE replay-then-follow, `POST /runs/{id}/approve|reject` (admin) resuming via `Command(resume=…)`. Graph gains deterministic `remediate` (§10.1 table + flag-revert override) and `approval` (`interrupt()`); policy `config/policy.yaml` (autonomy × risk × verified confidence, allowlists, public mode never executes). Incident lifecycle: awaiting_approval → investigating on reject. List prices in `models.yaml` → `runs.cost_usd`. **Live on captured S1:** one run concluded at 0.08 → no action → approval skipped; next run claimed 0.66 → verified 0.22 → `toggle_flag paymentFailure → off` → paused → approved → incident `remediating`; $0.0038, 13 tool calls. Fixed: thread-id collision (same second), `IntegrityError` now 409 not 503, root cause read from merged state not last step, duration = wall time, coverage `concurrency = [greenlet, thread]` (route 0 → 96 %). 141 tests, 94 %. |
+| 1.0.18 | 25 Sep 2026 | W3 D4 (2nd PR): `aegisops_agent.actions` — validation against `policy.yaml` (allowlists, strict patterns, replicas 1..3), LiveBackend (atomic flag-file replace; container restart via fixed Docker endpoints; scale/rollback refused by the demo target), ReplayBackend (simulated, recorded outcome), AuditWriter; `execute` node behind a conditional edge from `approval` + in-node re-check; migration `0006` `audit_log` (tool calls, decisions, actions with actor); post-action verification after 90 s over post-action data only → resolved/failed; graph-structure test (only edge into execute is from approval). Lifecycle: investigating → remediating for policy-auto. Process lesson: four scripted edits silently no-op'd after `ruff format` rewrapped code — edits now assert a single match. Four live drills: (1) a working fix judged failed — I blamed the atomic rename vs flagd's watcher, **wrong**: span timestamps showed errors stopped 2 s after the write; the cause was span-metrics flush lag in the verification window; (2) resolved but on "no reading = cleared"; (3) partial run skipped correlation → `toggle_flag` with no flag rejected at execute; (4) **W6 exit criterion met**: approve → flag off 17:02:10 → error rate 0.0 over post-grace data → resolved. Fixes: verification window starts 15 s after the action + exact error-span fallback + `basis` recorded; budget breach routes through `correlate_changes`; `toggle_flag` never proposed without a flag. 164 tests. |
 
 ---
 

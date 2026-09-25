@@ -77,6 +77,14 @@ class Settings(BaseSettings):
         description="Cassette file: replay model outputs instead of calling providers (tests/CI).",
     )
 
+    execute_enabled: bool = Field(
+        default=True,
+        description="Allow the execute node to change the local demo (ignored in public mode).",
+    )
+    verify_delay_s: float = Field(
+        default=90, ge=0, description="Wait after an action before re-checking the alert (E5.5)."
+    )
+
     alerts_enabled: bool = Field(default=True, description="Run the alert evaluator job.")
     alerts_config_path: str = Field(
         default="config/alerts.yaml", description="Default alert rules (seeded by name)."

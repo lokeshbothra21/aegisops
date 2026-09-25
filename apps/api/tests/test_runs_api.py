@@ -29,6 +29,7 @@ async def agent_app():  # type: ignore[no-untyped-def]
         alerts_enabled=False,
         admin_token=SecretStr(ADMIN_TOKEN),
         recorded_llm_path=CASSETTE,
+        verify_delay_s=0.2,
     )
     app = create_app(settings)
     engine = create_engine(settings)
@@ -65,6 +66,12 @@ async def agent_app():  # type: ignore[no-untyped-def]
             await s.execute(
                 text(
                     "DELETE FROM run_events WHERE run_id IN (SELECT id FROM runs WHERE incident_id = :i)"
+                ),
+                {"i": incident_id},
+            )
+            await s.execute(
+                text(
+                    "DELETE FROM audit_log WHERE run_id IN (SELECT id FROM runs WHERE incident_id = :i)"
                 ),
                 {"i": incident_id},
             )
@@ -154,7 +161,16 @@ async def test_run_pauses_for_approval_then_finishes_on_approve(agent_app) -> No
     assert body["finished_at"] and body["duration_ms"] is not None
     assert body["root_cause"]["category"] == "dependency_errors"  # kept after the resume
     assert body["duration_ms"] >= 100  # wall time incl. the approval wait, not only the resume leg
-    assert (await c.get(f"/api/v1/incidents/{incident_id}")).json()["status"] == "remediating"
+    # executed via the replay backend (captured scenario): simulated, recorded outcome
+    out = body["remediation"]
+    assert out["decision"] == "approved"
+    for _ in range(50):  # post-action verification after verify_delay_s
+        inc = (await c.get(f"/api/v1/incidents/{incident_id}")).json()
+        if inc["status"] == "resolved":
+            break
+        await asyncio.sleep(0.1)
+    assert inc["status"] == "resolved", inc["status"]
+    assert "resolved by toggle_flag" in inc["summary"]
     # approving twice is a conflict; the stream now ends with run/end
     assert (await c.post(f"/api/v1/runs/{run_id}/approve", json={}, headers=HDR)).status_code == 409
     r = await c.get(f"/api/v1/runs/{run_id}/events", params={"after": 8})
@@ -163,7 +179,35 @@ async def test_run_pauses_for_approval_then_finishes_on_approve(agent_app) -> No
         for line in r.text.splitlines()
         if line.startswith("data: ")
     ]
-    assert [(e["node"], e["type"]) for e in tail] == [("approval", "approved"), ("run", "end")]
+    assert [(e["node"], e["type"]) for e in tail] == [
+        ("approval", "approved"),
+        ("execute", "output"),
+        ("run", "end"),
+        ("verification", "cleared"),
+    ]
+    assert tail[1]["payload"]["simulated"] is True and tail[1]["payload"]["ok"] is True
+    # audit trail: every tool call (agent), the approval and the action (admin:shreyas)
+    from sqlalchemy import text
+
+    async with create_session_factory(agent_app[3])() as s:
+        rows = (
+            await s.execute(
+                text("SELECT node, tool, actor, ok FROM audit_log WHERE run_id = :r ORDER BY id"),
+                {"r": run_id},
+            )
+        ).all()
+        outcome = (
+            await s.execute(
+                text("SELECT outcome FROM remediations WHERE run_id = :r"), {"r": run_id}
+            )
+        ).scalar()
+    assert sum(1 for r in rows if r.actor == "agent") == 10
+    assert ("approval", "toggle_flag", "admin:shreyas", True) in [tuple(r) for r in rows]
+    assert ("execute", "toggle_flag", "admin:shreyas", True) in [tuple(r) for r in rows]
+    assert (
+        outcome["ok"] is True and outcome["simulated"] is True and outcome["alert_cleared"] is True
+    )
+    assert outcome["verified_at"]
 
 
 async def test_reject_returns_the_incident_to_investigating(agent_app) -> None:  # type: ignore[no-untyped-def]

@@ -27,6 +27,7 @@ from langgraph.types import Command
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncEngine
 
+from aegisops_agent.actions import ActionExecutor
 from aegisops_agent.graph import PROMPT_VERSION, AgentState, Deps, build_graph
 from aegisops_agent.llm import LLMClient, RecordedLLM, Router, load_models_config
 from aegisops_agent.remediation import Policy, load_policy
@@ -61,10 +62,15 @@ def make_graph(
     budget: Budget | None = None,
     policy: Policy | None = None,
     checkpointer: AsyncPostgresSaver | None = None,
+    executor: ActionExecutor | None = None,
+    run_id: int | None = None,
 ) -> tuple[Any, ToolRunner]:
     budget = budget or Budget()
-    tools = ToolRunner(factory=session_factory(engine), ctx=ctx, budget=budget)
-    deps = Deps(llm=llm, tools=tools, budget=budget, policy=policy)
+    audit = executor.audit if executor is not None else None
+    tools = ToolRunner(
+        factory=session_factory(engine), ctx=ctx, budget=budget, audit=audit, run_id=run_id
+    )
+    deps = Deps(llm=llm, tools=tools, budget=budget, policy=policy, executor=executor)
     return build_graph(deps, checkpointer=checkpointer), tools
 
 
@@ -76,8 +82,10 @@ def initial_state(
     autonomy_level: int = 1,
     public_mode: bool = False,
     auto_decision: str | None = None,
+    run_id: int | None = None,
 ) -> AgentState:
     return {
+        "run_id": run_id,
         "incident_id": incident_id,
         "service": service,
         "alert_summary": alert_summary,

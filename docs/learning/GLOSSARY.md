@@ -233,3 +233,11 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Remediation proposal | Deterministic action + params + risk; execution is a separate, gated node | D14 |
 | Replay-then-follow | Serve stored events after last id, then live ones; lossless reconnects | D14 |
 | Server-Sent Events (SSE) | One-way `text/event-stream` over HTTP with ids and auto-reconnect | D14 |
+| Allowlist validation | Accept only known-good values; reject everything else before acting | D15 |
+| Atomic file replace | Write temp file, rename over the original; readers never see half a file | D15 |
+| Audit log (actor) | Who/what/when/args/outcome for every tool call, decision and action | D15 |
+| Background task hygiene | Wrap `create_task` bodies so exceptions are logged, not lost | D15 |
+| Defence in depth | Independent guards: topology, re-check, policy, validation, backend, audit, verification | D15 |
+| Fixed argv / no shell | Typed calls to fixed endpoints; nothing reaches a shell | D15 |
+| Graph-structure test | Asserts on compiled graph edges, protecting the safety architecture | D15 |
+| Post-action verification | Re-measure the symptom over post-fix data; resolve or fail | D15 |
