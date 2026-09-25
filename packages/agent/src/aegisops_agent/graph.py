@@ -19,13 +19,15 @@ from typing import Any, TypedDict, cast
 
 import structlog
 from langgraph.graph import END, START, StateGraph
-from langgraph.types import Checkpointer
+from langgraph.types import Checkpointer, interrupt
 from pydantic import BaseModel
 
 from aegisops_agent.correlate import correlate_changes as _correlate
 from aegisops_agent.llm import LLMClient, LLMError, LLMResult
+from aegisops_agent.remediation import Policy, Remediation, evaluate, propose
 from aegisops_agent.schemas import (
     Budget,
+    ChangeCorrelation,
     Findings,
     Hypotheses,
     RootCause,
@@ -33,6 +35,7 @@ from aegisops_agent.schemas import (
     ToolRequest,
     Triage,
     Usage,
+    VerifiedRootCause,
 )
 from aegisops_agent.tools import BudgetExceededError, ToolRunner, tool_catalogue
 from aegisops_agent.verifier import Verifier
@@ -56,6 +59,12 @@ class AgentState(TypedDict, total=False):
     correlation: dict[str, Any]
     root_cause: dict[str, Any]
     verified_root_cause: dict[str, Any]
+    remediation: dict[str, Any]
+    policy_decision: dict[str, Any]
+    approval: dict[str, Any]  # {"decision": approved|rejected|auto, "by": str, "note": str}
+    autonomy_level: int
+    public_mode: bool
+    auto_decision: str | None  # CLI/tests without a checkpointer: answer approval with this
     # bookkeeping
     usage: dict[str, Any]
     budget_exceeded: str | None
@@ -70,11 +79,12 @@ def load_prompt(node: str) -> str:
 
 @dataclass
 class Deps:
-    """Everything a node needs that is not state: model access and tool access."""
+    """Everything a node needs that is not state: model access, tool access, policy."""
 
     llm: LLMClient
     tools: ToolRunner
     budget: Budget
+    policy: Policy | None = None
     clock: Callable[[], float] = time.monotonic
 
 
@@ -380,6 +390,86 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             ),
         }
 
+    async def remediate(state: AgentState) -> AgentState:
+        """Deterministic (E5.1): category -> action, flag-revert override, policy check."""
+        rc = VerifiedRootCause.model_validate(state["verified_root_cause"])
+        corr = (
+            ChangeCorrelation.model_validate(state["correlation"])
+            if state.get("correlation")
+            else None
+        )
+        rem: Remediation = propose(rc, corr)
+        decision = None
+        if deps.policy is not None:
+            decision = evaluate(
+                deps.policy,
+                rem,
+                autonomy_level=int(state.get("autonomy_level", 1)),
+                public_mode=bool(state.get("public_mode", False)),
+            )
+        return {
+            "remediation": rem.model_dump(),
+            "policy_decision": decision.model_dump()
+            if decision
+            else {"auto": False, "reason": "no policy loaded"},
+            "events": _event(
+                state,
+                "remediate",
+                "output",
+                action=rem.action.value,
+                params=rem.params,
+                risk=rem.risk.value,
+                confidence=rem.confidence,
+                auto=bool(decision and decision.auto),
+                policy=decision.reason if decision else "no policy",
+            ),
+        }
+
+    async def approval(state: AgentState) -> AgentState:
+        """Pause for a human unless policy says auto (E5.2). `interrupt()` checkpoints the
+        graph; the API resumes it with {"decision": ..., "by": ...}."""
+        rem = state["remediation"]
+        if rem.get("action") == "none":
+            return {
+                "approval": {"decision": "skipped", "by": "policy", "note": "nothing to execute"},
+                "events": _event(state, "approval", "skipped", reason="no action proposed"),
+            }
+        if state.get("policy_decision", {}).get("auto"):
+            return {
+                "approval": {
+                    "decision": "auto",
+                    "by": "policy",
+                    "note": state["policy_decision"]["reason"],
+                },
+                "events": _event(
+                    state, "approval", "auto", reason=state["policy_decision"]["reason"]
+                ),
+            }
+        if state.get("auto_decision"):
+            auto = str(state["auto_decision"])
+            return {
+                "approval": {"decision": auto, "by": "cli", "note": "no checkpointer"},
+                "events": _event(state, "approval", auto, by="cli"),
+            }
+        answer = interrupt(
+            {
+                "type": "approval_requested",
+                "remediation": rem,
+                "root_cause": state.get("verified_root_cause"),
+                "policy": state.get("policy_decision"),
+            }
+        )
+        result: dict[str, Any] = (
+            dict(answer) if isinstance(answer, dict) else {"decision": str(answer)}
+        )
+        result.setdefault("by", "unknown")
+        return {
+            "approval": result,
+            "events": _event(
+                state, "approval", str(result.get("decision", "unknown")), by=result.get("by")
+            ),
+        }
+
     return {
         "triage": triage,
         "plan": plan,
@@ -387,6 +477,8 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
         "correlate_changes": correlate,
         "root_cause": root_cause,
         "verify_evidence": verify,
+        "remediate": remediate,
+        "approval": approval,
     }
 
 
@@ -414,5 +506,7 @@ def build_graph(deps: Deps, checkpointer: Checkpointer | None = None) -> Any:
     )
     g.add_edge("correlate_changes", "root_cause")
     g.add_edge("root_cause", "verify_evidence")
-    g.add_edge("verify_evidence", END)
+    g.add_edge("verify_evidence", "remediate")
+    g.add_edge("remediate", "approval")
+    g.add_edge("approval", END)  # execute (W6) will sit between approval and END
     return g.compile(checkpointer=checkpointer, name="aegisops-investigation")

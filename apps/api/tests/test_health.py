@@ -34,3 +34,23 @@ async def test_readyz_is_503_when_database_unreachable() -> None:
         r = await c.get("/readyz")
     assert r.status_code == 503
     assert r.json()["checks"]["database"] is False
+
+
+async def test_integrity_error_is_409_not_503() -> None:
+    """A unique-constraint violation must not be reported as a database outage."""
+    from fastapi import FastAPI
+    from httpx import ASGITransport
+    from sqlalchemy.exc import IntegrityError
+
+    from aegisops_api.errors import install_error_handlers
+
+    app = FastAPI()
+    install_error_handlers(app)
+
+    @app.get("/boom")
+    async def boom() -> None:
+        raise IntegrityError("INSERT ...", {}, Exception("duplicate key"))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as c:
+        r = await c.get("/boom")
+    assert r.status_code == 409 and r.json()["title"] == "Conflict"

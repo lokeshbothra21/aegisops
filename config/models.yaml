@@ -6,3 +6,9 @@ primary: gemini:gemini-3.5-flash
 secondary: groq:openai/gpt-oss-120b
 nodes:
   triage: gemini:gemini-3.5-flash-lite   # cheap model for the cheap step
+# List prices in USD per 1M tokens (free tiers bill $0; these make cost-per-run comparable).
+# Checked 25 Sep 2026; update when providers change them.
+prices:
+  gemini-3.5-flash: {in: 0.30, out: 2.50}
+  gemini-3.5-flash-lite: {in: 0.10, out: 0.40}
+  openai/gpt-oss-120b: {in: 0.15, out: 0.60}

@@ -53,4 +53,7 @@ testpaths = ["apps/api/tests", "packages/*/tests"]
 addopts = "-q --strict-markers"
 
 [tool.coverage.run]
+# SQLAlchemy async runs ORM code inside greenlets; without this, lines executed there are
+# reported as missed (route handlers showed 0 % while their tests passed).
+concurrency = ["greenlet", "thread"]
 source = ["aegisops_api", "aegisops_agent", "aegisops_tools", "aegisops_alerts", "aegisops_bench"]

@@ -55,7 +55,15 @@ async def test_s1_end_to_end_with_recorded_model(engine: AsyncEngine, scenario: 
         "correlate_changes",
         "root_cause",
         "verify_evidence",
+        "remediate",
     ]
+    assert state["remediation"]["action"] == "toggle_flag"  # flag-revert override from correlation
+    assert state["remediation"]["params"] == {
+        "flag": "paymentFailure",
+        "variant": "off",
+        "service": "payment",
+    }
+    assert state["approval"]["decision"] == "rejected" and state["approval"]["by"] == "cli"
     calls = [c[0] for c in llm.calls]
     assert calls == ["triage", "plan", "investigate", "root_cause"]
     records = state["tool_records"]  # type: ignore[typeddict-item]
@@ -182,6 +190,7 @@ async def test_checkpointer_persists_state_per_thread(engine: AsyncEngine, scena
     assert tup is not None
     values = tup.checkpoint["channel_values"]
     assert values["verified_root_cause"]["category"] == "dependency_errors"
+    assert values["approval"]["decision"] == "rejected"  # interrupted, then resumed by the CLI path
     assert values["triage"]["service"] == "payment"
 
 
@@ -213,4 +222,5 @@ async def test_model_outage_degrades_to_a_partial_report(
     assert "model providers unavailable" in rc.statement
     kinds = [(e["node"], e["type"]) for e in state["events"]]
     assert ("plan", "llm_unavailable") in kinds and ("root_cause", "failed") in kinds
-    assert kinds[-1] == ("verify_evidence", "output")  # the verifier still ran
+    assert ("verify_evidence", "output") in kinds  # the verifier still ran
+    assert kinds[-1] == ("approval", "skipped")  # zero confidence -> nothing to approve

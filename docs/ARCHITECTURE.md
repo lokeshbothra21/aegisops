@@ -70,7 +70,7 @@ Measured on 17 Sep: flag toggle → first ERROR spans in Postgres in 6 s; 15 ser
 
 The agent never knows the mode; the tool layer and the action backend do.
 
-## 6. Agent state machine (built: triage→plan→investigate→correlate_changes→root_cause→verify_evidence; planned: remediate→approval→execute→postmortem, W5–W6)
+## 6. Agent state machine (built: triage→plan→investigate→correlate_changes→root_cause→verify_evidence→remediate→approval; planned: execute→postmortem, W6/W10)
 
 ```mermaid
 stateDiagram-v2
@@ -108,7 +108,7 @@ Every table has `id bigserial` and `created_at`. Planned tables: `runs`, `run_ev
 
 ## 8. API surface
 
-Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `GET /api/v1/scenarios[/{key}]`, `POST /api/v1/admin/{retention,service-edges}/run`, `POST /api/v1/admin/capture` (X-Admin-Token). All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
+Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `GET /api/v1/scenarios[/{key}]`, `POST /api/v1/incidents/{id}/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/events` (SSE), `POST /api/v1/runs/{id}/approve|reject`, `POST /api/v1/admin/{retention,service-edges}/run`, `POST /api/v1/admin/capture` (X-Admin-Token on mutating admin/approval routes). All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
 
 ## 9. Deployment and operations
 
@@ -134,3 +134,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 | 22 Sep 2026 | Tools package: nine read tools, untrusted envelope, MCP server (ADR-007). |
 | 23 Sep 2026 | Agent skeleton: LangGraph graph with checkpoints, structured outputs, budgets, router, cassettes, CLI (ADR-016). Same day: evidence verifier, change correlation, follow-up round; first real model runs. |
 | 24 Sep 2026 | Scenario catalogue, runner, capture (`scenarios` table, migration 0004), fixtures, replay command. |
+| 25 Sep 2026 | Runs API + SSE, remediate and approval nodes (interrupt/resume), policy, cost per run (migration 0005). |
