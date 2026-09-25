@@ -70,7 +70,7 @@ Measured on 17 Sep: flag toggle → first ERROR spans in Postgres in 6 s; 15 ser
 
 The agent never knows the mode; the tool layer and the action backend do.
 
-## 6. Agent state machine (built: triage→plan→investigate→correlate_changes→root_cause→verify_evidence→remediate→approval; planned: execute→postmortem, W6/W10)
+## 6. Agent state machine (built: triage→plan→investigate→correlate_changes→root_cause→verify_evidence→remediate→approval→execute; planned: postmortem, W10)
 
 ```mermaid
 stateDiagram-v2
@@ -134,4 +134,4 @@ Untrusted-content wrapping of every tool output; structured outputs everywhere; 
 | 22 Sep 2026 | Tools package: nine read tools, untrusted envelope, MCP server (ADR-007). |
 | 23 Sep 2026 | Agent skeleton: LangGraph graph with checkpoints, structured outputs, budgets, router, cassettes, CLI (ADR-016). Same day: evidence verifier, change correlation, follow-up round; first real model runs. |
 | 24 Sep 2026 | Scenario catalogue, runner, capture (`scenarios` table, migration 0004), fixtures, replay command. |
-| 25 Sep 2026 | Runs API + SSE, remediate and approval nodes (interrupt/resume), policy, cost per run (migration 0005). |
+| 25 Sep 2026 | Runs API + SSE, remediate and approval nodes (interrupt/resume), policy, cost per run (migration 0005). Same day: execute node, actions (live + replay backends), validation, audit log (0006), post-action verification, graph-structure test. |

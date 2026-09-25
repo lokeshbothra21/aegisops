@@ -108,6 +108,9 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | `409 Run already active` | One running or awaiting-approval run per incident. Decide the pending one first. |
 | `503 Agent disabled` on /runs | `AEGIS_AGENT_ENABLED=false`, or the checkpointer could not reach Postgres at startup (`agent.checkpointer_unavailable` in logs; expected on Cloud Run until Supabase). |
 | Same scenario, very different confidence run to run | Model non-determinism and which provider answered (see `model` on the run). Verified confidence is what the policy uses; compare several runs, never one. |
+| Approved fix did nothing | Check the remediation's `outcome` (`GET /runs/<id>`): `rejected:` = validation (not allowlisted in `config/policy.yaml`); `no live backend configured` = `AEGIS_FLAGD_CONFIG_PATH`/`AEGIS_DOCKER_SOCKET` unset; `not supported by the local demo target` = scale/rollback. Every attempt is in `audit_log`. |
+| Incident marked `failed` after an approved fix | Post-action verification found the rule still breaching over post-fix data (`outcome.value_after`). The fix did not work, or traffic was too thin to judge; investigate or start a new run. |
+| Who changed what? | `select ts, node, tool, actor, ok, args from audit_log where run_id = <run> order by id;` Actors: `agent`, `admin:<name>`, `policy:auto`. |
 | Drift test complains about `checkpoint*` tables | They belong to LangGraph's saver, not Alembic; `include_object` in `models/base.py` must skip them. |
 | Gemini 429 / quota exhausted | Router falls back to Groq; if both exhausted, public mode serves cached runs; check Langfuse for the burst source. |
 | Cost spike | Check `runs` for tool_calls/tokens outliers; lower the global daily cap in config; rotate the key if abused. |

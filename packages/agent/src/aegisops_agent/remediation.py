@@ -114,7 +114,18 @@ def propose(rc: VerifiedRootCause, corr: ChangeCorrelation | None) -> Remediatio
             ],
         )
     actions, risk = CATEGORY_ACTIONS[rc.category]
-    first = actions[0]
+    # toggle_flag needs a flag; only the override above can name one. Never propose an action
+    # without its required parameters (found live: toggle_flag {service} reached execute).
+    usable = [a for a in actions if a is not Action.toggle_flag]
+    if not usable:
+        return Remediation(
+            action=Action.none,
+            risk=Risk.low,
+            confidence=rc.confidence,
+            rationale=f"{rc.category.value}: no flag change identified to revert; report only",
+            alternatives=[a.value for a in actions],
+        )
+    first = usable[0]
     params: dict[str, Any] = {"service": rc.service}
     if first is Action.scale_service:
         params["replicas"] = 2
@@ -128,7 +139,7 @@ def propose(rc: VerifiedRootCause, corr: ChangeCorrelation | None) -> Remediatio
         risk=risk,
         confidence=rc.confidence,
         rationale=f"{rc.category.value}: {rc.statement[:300]}",
-        alternatives=[a.value for a in actions[1:]],
+        alternatives=[a.value for a in actions if a is not first],
     )
 
 

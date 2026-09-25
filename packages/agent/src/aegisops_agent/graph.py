@@ -22,9 +22,10 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Checkpointer, interrupt
 from pydantic import BaseModel
 
+from aegisops_agent.actions import ActionExecutor
 from aegisops_agent.correlate import correlate_changes as _correlate
 from aegisops_agent.llm import LLMClient, LLMError, LLMResult
-from aegisops_agent.remediation import Policy, Remediation, evaluate, propose
+from aegisops_agent.remediation import Action, Policy, Remediation, evaluate, propose
 from aegisops_agent.schemas import (
     Budget,
     ChangeCorrelation,
@@ -65,6 +66,8 @@ class AgentState(TypedDict, total=False):
     autonomy_level: int
     public_mode: bool
     auto_decision: str | None  # CLI/tests without a checkpointer: answer approval with this
+    run_id: int | None
+    execution: dict[str, Any]
     # bookkeeping
     usage: dict[str, Any]
     budget_exceeded: str | None
@@ -85,7 +88,13 @@ class Deps:
     tools: ToolRunner
     budget: Budget
     policy: Policy | None = None
+    executor: ActionExecutor | None = None
     clock: Callable[[], float] = time.monotonic
+
+    def policy_allows_execute(self) -> bool:
+        return (
+            True  # public mode is decided per run (state.public_mode); policy file carries the cap
+        )
 
 
 def _event(state: AgentState, node: str, kind: str, **payload: Any) -> list[dict[str, Any]]:
@@ -470,6 +479,53 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
             ),
         }
 
+    async def execute(state: AgentState) -> AgentState:
+        """The only node that changes the target (E5.3). Re-checks the decision itself: the
+        graph edge is one guard, this is the second (§11 "graph bypass")."""
+        approval_ = state.get("approval") or {}
+        rem = state.get("remediation") or {}
+        decision = approval_.get("decision")
+        if decision not in EXECUTABLE_DECISIONS:
+            raise RuntimeError(f"execute reached with decision {decision!r}: graph bypass")
+        if state.get("public_mode") or deps.policy is None or not deps.policy_allows_execute():
+            out = {
+                "ok": False,
+                "action": rem.get("action"),
+                "details": "execution disabled (public mode)",
+                "simulated": False,
+            }
+        elif deps.executor is None:
+            out = {
+                "ok": False,
+                "action": rem.get("action"),
+                "details": "no executor configured",
+                "simulated": False,
+            }
+        else:
+            actor = (
+                "policy:auto" if decision == "auto" else f"admin:{approval_.get('by', 'unknown')}"
+            )
+            outcome = await deps.executor.execute(
+                Action(rem.get("action", "none")),
+                dict(rem.get("params") or {}),
+                replay=deps.tools.ctx.scenario_id is not None,
+                run_id=state.get("run_id"),
+                actor=actor,
+            )
+            out = outcome.model_dump()
+        return {
+            "execution": out,
+            "events": _event(
+                state,
+                "execute",
+                "output" if out.get("ok") else "failed",
+                action=out.get("action"),
+                ok=out.get("ok"),
+                details=out.get("details"),
+                simulated=out.get("simulated"),
+            ),
+        }
+
     return {
         "triage": triage,
         "plan": plan,
@@ -479,12 +535,27 @@ def build_nodes(deps: Deps) -> dict[str, NodeFn]:
         "verify_evidence": verify,
         "remediate": remediate,
         "approval": approval,
+        "execute": execute,
     }
 
 
+EXECUTABLE_DECISIONS = frozenset({"approved", "auto"})
+
+
+def _after_approval(state: AgentState) -> str:
+    """The ONLY way into `execute` (E9.2): an approved or policy-auto decision on a real action."""
+    decision = (state.get("approval") or {}).get("decision")
+    action = (state.get("remediation") or {}).get("action", "none")
+    return "execute" if decision in EXECUTABLE_DECISIONS and action != "none" else "end"
+
+
 def _after(node_next: str) -> Callable[[AgentState], str]:
+    """On a budget breach skip the remaining model nodes but still run `correlate_changes`:
+    it is deterministic and free, and without it the flag-revert override cannot fire
+    (found live: a partial run proposed toggle_flag with no flag)."""
+
     def route(state: AgentState) -> str:
-        return "root_cause" if state.get("budget_exceeded") else node_next
+        return "correlate_changes" if state.get("budget_exceeded") else node_next
 
     return route
 
@@ -495,18 +566,21 @@ def build_graph(deps: Deps, checkpointer: Checkpointer | None = None) -> Any:
     for name, fn in nodes.items():
         g.add_node(name, cast(Any, fn))  # LangGraph's node protocol is not expressible for mypy
     g.add_edge(START, "triage")
-    g.add_conditional_edges("triage", _after("plan"), {"plan": "plan", "root_cause": "root_cause"})
     g.add_conditional_edges(
-        "plan", _after("investigate"), {"investigate": "investigate", "root_cause": "root_cause"}
+        "triage", _after("plan"), {"plan": "plan", "correlate_changes": "correlate_changes"}
     )
     g.add_conditional_edges(
-        "investigate",
-        _after("correlate_changes"),
-        {"correlate_changes": "correlate_changes", "root_cause": "root_cause"},
+        "plan",
+        _after("investigate"),
+        {"investigate": "investigate", "correlate_changes": "correlate_changes"},
+    )
+    g.add_conditional_edges(
+        "investigate", _after("correlate_changes"), {"correlate_changes": "correlate_changes"}
     )
     g.add_edge("correlate_changes", "root_cause")
     g.add_edge("root_cause", "verify_evidence")
     g.add_edge("verify_evidence", "remediate")
     g.add_edge("remediate", "approval")
-    g.add_edge("approval", END)  # execute (W6) will sit between approval and END
+    g.add_conditional_edges("approval", _after_approval, {"execute": "execute", "end": END})
+    g.add_edge("execute", END)
     return g.compile(checkpointer=checkpointer, name="aegisops-investigation")

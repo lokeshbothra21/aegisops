@@ -135,7 +135,10 @@ async def test_budget_breach_short_circuits_to_a_partial_root_cause(
     assert state["budget_exceeded"] == "tool_calls"
     assert rc.partial is True
     nodes = [c[0] for c in llm.calls]
-    assert "investigate" not in nodes and nodes[-1] == "root_cause"  # plan's tools tripped the cap
+    assert "investigate" not in nodes and nodes[-1] == "root_cause"
+    assert state["correlation"][
+        "events"
+    ]  # correlation still ran after the breach  # plan's tools tripped the cap
     assert "verified_root_cause" in state  # the verifier still runs on a partial report
 
 

@@ -38,7 +38,7 @@ select = ["E", "F", "I", "B", "UP", "S", "N", "ASYNC", "RUF"]
 ignore = ["S101"]  # assert is fine in tests
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["S105", "S106", "E501", "S608"]  # fixtures with long SQL/JSON literals
+"**/tests/**" = ["S105", "S106", "E501", "S608", "ASYNC240"]  # fixtures with long SQL/JSON literals
 "packages/tools/src/aegisops_tools/testing.py" = ["E501"]  # shared SQL fixtures
 
 [tool.mypy]

@@ -203,7 +203,8 @@ async def test_graph_pauses_at_approval_and_resumes_with_the_decision(
                 graph, resume_command("approved", "shreyas", "ship it"), thread
             )
         ]
-        assert [s.node for s in resumed] == ["approval"]
+        assert [s.node for s in resumed] == ["approval", "execute"]  # approved -> execute runs
+        assert resumed[1].update["execution"]["details"] == "no executor configured"
         assert resumed[0].update["approval"] == {
             "decision": "approved",
             "by": "shreyas",
@@ -236,3 +237,19 @@ async def test_level_2_auto_approves_low_risk(engine: AsyncEngine, scenario: str
     assert (
         final["policy_decision"]["auto"] is False and "0.45" in final["policy_decision"]["reason"]
     )
+
+
+def test_toggle_flag_is_never_proposed_without_a_flag() -> None:
+    """Found live: app_bug maps to toggle_flag, but with no flag change to revert the proposal
+    went out as toggle_flag {service} and was rejected at execute."""
+    for cat in (
+        RootCauseCategory.app_bug,
+        RootCauseCategory.config_regression,
+        RootCauseCategory.latency_regression,
+    ):
+        rem = propose(_rc(cat), None)
+        assert rem.action is not Action.toggle_flag, cat
+        if rem.action is not Action.none:
+            assert rem.params.get("service") == "payment"
+    assert propose(_rc(RootCauseCategory.app_bug), None).action is Action.none
+    assert propose(_rc(RootCauseCategory.app_bug), _corr()).params["flag"] == "paymentFailure"

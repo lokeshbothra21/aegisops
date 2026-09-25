@@ -47,6 +47,8 @@ class RemediationOut(BaseModel):
     decision: str
     decided_by: str | None
     decided_at: datetime | None
+    executed_at: datetime | None = None
+    outcome: dict[str, Any] | None = None
 
     model_config = {"from_attributes": True}
 

@@ -14,6 +14,7 @@ import structlog
 from fastapi import FastAPI
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
+from aegisops_agent.actions import ActionExecutor, AuditWriter, LiveBackend, ReplayBackend
 from aegisops_agent.llm import LLMClient, RecordedLLM, Router, load_models_config
 from aegisops_agent.remediation import load_policy
 from aegisops_agent.run import psycopg_url
@@ -106,11 +107,27 @@ def build_run_manager(app: FastAPI, engine: Any, saver: AsyncPostgresSaver) -> R
             return RecordedLLM.from_file(settings.recorded_llm_path)
         return Router.from_env(models)
 
+    policy = load_policy(settings.policy_config_path)
+    live = None
+    if settings.execute_enabled and not settings.public_mode and settings.flagd_config_path:
+        live = LiveBackend(
+            flagd_path=Path(settings.flagd_config_path),
+            docker_socket=settings.docker_socket,
+            compose_project=settings.docker_compose_project,
+        )
+    executor = ActionExecutor(
+        policy=policy,
+        replay=ReplayBackend(),
+        live=live,
+        audit=AuditWriter(app.state.session_factory),
+    )
     return RunManager(
+        executor=executor,
+        verify_delay_s=settings.verify_delay_s,
         engine=engine,
         factory=app.state.session_factory,
         llm_factory=llm_factory,
-        policy=load_policy(settings.policy_config_path),
+        policy=policy,
         checkpointer=saver,
         prices=models.prices,
         public_mode=settings.public_mode,
