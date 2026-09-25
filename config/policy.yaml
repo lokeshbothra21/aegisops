@@ -1,0 +1,26 @@
+# Remediation policy (PROJECT.md §10, E5.4 first cut). Read at API start; per-incident
+# autonomy_level (default 1) picks the row. Public mode overrides everything.
+autonomy:
+  1: {auto: []}                              # recommend: always wait for a human
+  2: {auto: [low], min_confidence: 0.85}     # auto-execute low risk when confident
+  3: {auto: [low, medium], min_confidence: 0.90}
+actions:
+  toggle_flag:
+    risk: low
+    allowed_flags: [paymentFailure, paymentUnreachable, cartFailure, productCatalogFailure,
+                    recommendationCacheFailure, adHighCpu, adFailure, adManualGc, emailMemoryLeak,
+                    kafkaQueueProblems, intlShippingSlowdown, imageSlowLoad, failedReadinessProbe]
+  restart_service:
+    risk: low
+    allowed_services: [checkout, payment, cart, product-catalog, recommendation, ad, email,
+                       shipping, currency, quote, frontend, frontend-proxy, image-provider]
+  scale_service:
+    risk: medium
+    max_replicas: 3
+    allowed_services: [checkout, payment, cart, product-catalog, recommendation, ad, email, shipping]
+  rollback_deployment:
+    risk: medium
+    allowed_services: [checkout, payment, cart, product-catalog, recommendation, ad, email, shipping]
+public_mode:
+  max_autonomy: 1
+  execute_enabled: false

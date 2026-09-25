@@ -63,6 +63,20 @@ class Settings(BaseSettings):
         default=10, ge=1, description="Container poll interval."
     )
 
+    agent_enabled: bool = Field(
+        default=True, description="Expose /runs and drive the agent in-process."
+    )
+    models_config_path: str = Field(default="config/models.yaml")
+    policy_config_path: str = Field(default="config/policy.yaml")
+    public_mode: bool = Field(
+        default=False,
+        description="Public replay deployment: max autonomy 1, execution disabled (§10.3).",
+    )
+    recorded_llm_path: str | None = Field(
+        default=None,
+        description="Cassette file: replay model outputs instead of calling providers (tests/CI).",
+    )
+
     alerts_enabled: bool = Field(default=True, description="Run the alert evaluator job.")
     alerts_config_path: str = Field(
         default="config/alerts.yaml", description="Default alert rules (seeded by name)."

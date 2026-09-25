@@ -220,6 +220,7 @@ class RouteConfig(BaseModel):
     primary: str  # "gemini:gemini-2.5-flash"
     secondary: str | None = None  # "groq:llama-3.3-70b-versatile"
     nodes: dict[str, str] = {}  # node -> "provider:model" override for the primary
+    prices: dict[str, dict[str, float]] = {}  # model -> {"in": $/1M tokens, "out": $/1M tokens}
 
 
 def load_models_config(path: str | Path) -> RouteConfig:

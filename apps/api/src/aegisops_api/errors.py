@@ -7,7 +7,7 @@ from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from sqlalchemy.exc import DBAPIError, OperationalError
+from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 PROBLEM_MEDIA_TYPE = "application/problem+json"
@@ -64,6 +64,16 @@ def install_error_handlers(app: FastAPI) -> None:
     async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:
         title = exc.detail if isinstance(exc.detail, str) else "HTTP error"
         return problem_response(request, exc.status_code, title, headers=exc.headers)
+
+    @app.exception_handler(IntegrityError)
+    async def _conflict(request: Request, exc: IntegrityError) -> JSONResponse:
+        # a constraint violation is the caller's conflict, not a database outage
+        return problem_response(
+            request,
+            status.HTTP_409_CONFLICT,
+            "Conflict",
+            type(exc.orig).__name__ if exc.orig else None,
+        )
 
     @app.exception_handler(OperationalError)
     @app.exception_handler(DBAPIError)

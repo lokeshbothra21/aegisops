@@ -2,9 +2,9 @@
 
 open → investigating → awaiting_approval → remediating → resolved | failed
 
-`awaiting_approval` may skip to `resolved` (nothing to do) or `failed` (rejected +
-nothing else possible); `investigating` may go straight to `failed` (budget
-exceeded with no usable root cause). Every other jump is a bug and raises.
+`awaiting_approval` may go back to `investigating` (proposal rejected), skip to
+`resolved` (nothing to do) or `failed`; `investigating` may go straight to `failed`
+(budget exceeded with no usable root cause). Every other jump is a bug and raises.
 Terminal states set `closed_at`.
 """
 
@@ -19,7 +19,8 @@ S = IncidentStatus
 ALLOWED: dict[IncidentStatus, frozenset[IncidentStatus]] = {
     S.open: frozenset({S.investigating, S.resolved, S.failed}),
     S.investigating: frozenset({S.awaiting_approval, S.resolved, S.failed}),
-    S.awaiting_approval: frozenset({S.remediating, S.resolved, S.failed}),
+    # rejected proposal -> back to investigating (a human takes over or a new run starts)
+    S.awaiting_approval: frozenset({S.remediating, S.investigating, S.resolved, S.failed}),
     S.remediating: frozenset({S.resolved, S.failed}),
     S.resolved: frozenset(),
     S.failed: frozenset(),

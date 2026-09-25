@@ -34,6 +34,9 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **How will you compute p95 from stored histograms?** Bucket counts + explicit bounds in `attrs.otel.histogram`; interpolate within the bucket that crosses the 95th percentile.
 
 ## Agent
+- **How does a human approve without the agent holding a process open?** `interrupt()` checkpoints; `Command(resume=…)` on the same thread continues later, even after a restart. (Day 14)
+- **Why SSE for run progress?** One-way, plain HTTP, auto-reconnect; replay-then-follow from `run_events` makes reconnects lossless.
+- **How is a low-confidence answer kept from acting?** Verified confidence feeds the policy; level 1 always asks; level 2 needs ≥ 0.85; public mode never executes.
 - **How do you verify an LLM's claims without another LLM?** Structured citations checked by code against the store; drop failures; confidence × verified/cited; keep the claimed value for calibration. (Day 12)
 - **What did change correlation change?** The model cited the flag flip once the scored change list was in its input; before, it ignored it.
 - **How do you handle a slow provider?** 30 s timeout = down; fall back to the secondary; log the exception type.

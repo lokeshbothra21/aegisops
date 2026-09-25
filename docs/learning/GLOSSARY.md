@@ -222,3 +222,14 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Docker context | Which daemon the CLI targets; an empty daemon looks like data loss | D13 |
 | Replay clock | The frozen "now" for replay: the expected service's first incident | D13 |
 | Retry-After | Provider header telling the client when to retry; honoured, capped at 60 s | D13 |
+| 202 Accepted | Work started, not finished; client polls or streams | D14 |
+| Autonomy level | 1 asks always; 2 acts alone on low risk ≥ 0.85; 3 on medium ≥ 0.90; public mode caps at 1 | D14 |
+| Command(resume=…) | Continue an interrupted LangGraph thread with the human's answer | D14 |
+| Cost per run | tokens × list price per model; makes runs comparable | D14 |
+| Coverage concurrency | Tell coverage about greenlets/threads or it under-reports | D14 |
+| Flag-revert override | Recent flag change on the service beats the category table: flip it back | D14 |
+| interrupt() | LangGraph checkpoint-and-stop awaiting an external answer | D14 |
+| IntegrityError vs OperationalError | Constraint violation → 409; unreachable DB → 503 | D14 |
+| Remediation proposal | Deterministic action + params + risk; execution is a separate, gated node | D14 |
+| Replay-then-follow | Serve stored events after last id, then live ones; lossless reconnects | D14 |
+| Server-Sent Events (SSE) | One-way `text/event-stream` over HTTP with ids and auto-reconnect | D14 |
