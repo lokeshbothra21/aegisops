@@ -7,7 +7,14 @@
 - **Keep-alive (E11.5):** the uptime workflow now requires `/readyz` to answer 200 every 6 hours. That is a `SELECT 1` on Supabase, which stops the free-tier project from pausing after 7 idle days, and a red run if it ever does.
 
 ## Live result
-LIVE_RESULT_PLACEHOLDER
+After PR #30 (below), revision `00032` passed the tagged-URL probe and took 100% of traffic:
+- `/livez` 200; `/readyz` 200 with `{"checks":{"database":true}}`: Cloud Run in Mumbai reaches Supabase in Singapore through the Session pooler.
+- Startup logs show `alerts.rules_seeded` and `agent.ready`: migrations checked, the four alert rules seeded, the LangGraph checkpointer connected.
+- `GET /api/v1/incidents` 200 with an empty list; `GET /api/v1/scenarios` 200 `[]`: the production database is empty until a scenario is imported.
+- `POST /api/v1/admin/capture` without a token: 401. Approve and reject need the admin token too.
+- Uptime workflow (manual dispatch) green, so the keep-alive path is proven.
+
+**Known gap:** starting a run (`POST /incidents/{id}/runs`) is public by design (§8), but the rate limit that should guard it (FR-16) is not built yet. Harmless today because there are no incidents to run on; it must land before any scenario is imported or the URL is shared, or a visitor could burn the free LLM quota.
 
 ## The first deploy failed, and the gate worked
 PR #29 merged green, but its deploy failed: the new revision's container exited at startup with `FileNotFoundError: config/models.yaml`. The Docker image copied `apps/` and `packages/` but never `config/`. Until today production had no database, so the agent stayed off and never read that file; with Supabase connected, the agent started, looked for its model config and crashed the app. Cloud Run's startup probe failed, the revision never got traffic, and the previous revision kept serving: the probe-before-traffic design did exactly its job.
