@@ -101,7 +101,7 @@ jobs:
           platforms: linux/amd64
 
       - name: Deploy new revision with no traffic
-        run: |
+        run: |  # pragma: allowlist secret (secret NAMES for --set-secrets; values live in Secret Manager)
           # gcloud rejects --no-traffic when the service does not exist yet, so the
           # very first deploy serves immediately; every later one is probed first.
           if gcloud run services describe "$SERVICE" --region "${{ vars.GCP_REGION }}" >/dev/null 2>&1; then
@@ -116,7 +116,8 @@ jobs:
             --platform managed --allow-unauthenticated --port 8080 \
             --cpu 1 --memory 1Gi --timeout 900 --concurrency 10 \
             --min-instances 0 --max-instances 3 --cpu-boost --session-affinity \
-            --set-env-vars "AEGIS_ENV=prod,AEGIS_LOG_JSON=true,AEGIS_LOG_LEVEL=INFO" \
+            --set-env-vars "AEGIS_ENV=prod,AEGIS_LOG_JSON=true,AEGIS_LOG_LEVEL=INFO,AEGIS_PUBLIC_MODE=true" \
+            --set-secrets "AEGIS_DATABASE_URL=aegis-database-url:latest,AEGIS_ADMIN_TOKEN=aegis-admin-token:latest,AEGIS_GEMINI_API_KEY=aegis-gemini-api-key:latest,AEGIS_GROQ_API_KEY=aegis-groq-api-key:latest" \
             --labels "commit=${{ steps.meta.outputs.short }},managed-by=github-actions" \
             --tag "sha-${{ steps.meta.outputs.short }}" \
             $TRAFFIC_FLAG --quiet
@@ -133,10 +134,15 @@ jobs:
             sleep 5
           done
           [ "${ok:-0}" = 1 ] || { echo "::error::/livez never answered on $TAG_URL"; exit 1; }
-          # /readyz is reported, not gated, until Supabase (E11.5) gives prod a database.
-          code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$TAG_URL/readyz" || true)
+          # /readyz is a hard gate since E11.5: a revision that cannot reach Supabase never gets traffic
+          for i in $(seq 1 6); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$TAG_URL/readyz" || true)
+            [ "$code" = "200" ] && break
+            sleep 5
+          done
           echo "readyz=$code" >> "$GITHUB_OUTPUT"
           echo "/readyz -> $code"
+          [ "$code" = "200" ] || { echo "::error::/readyz answered $code on $TAG_URL (database unreachable?)"; exit 1; }
 
       - name: Shift 100% traffic to the new revision
         run: gcloud run services update-traffic "$SERVICE" --region "${{ vars.GCP_REGION }}" --to-latest --quiet
@@ -150,6 +156,6 @@ jobs:
             echo "### Deployed \`$SERVICE\` @ \`${{ steps.meta.outputs.short }}\`"
             echo "- URL: ${{ steps.url.outputs.url }}"
             echo "- Revision tag: ${{ steps.probe.outputs.tag_url }}"
-            echo "- /readyz on the new revision: ${{ steps.probe.outputs.readyz }} (503 is expected until E11.5)"
+            echo "- /readyz on the new revision: ${{ steps.probe.outputs.readyz }}"
             echo "- Rollback: \`gcloud run services update-traffic $SERVICE --region ${{ vars.GCP_REGION }} --to-revisions=<prev>=100\`"
           } >> "$GITHUB_STEP_SUMMARY"
