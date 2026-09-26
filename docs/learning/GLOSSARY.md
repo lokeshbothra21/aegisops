@@ -244,5 +244,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Connection pooler (session vs transaction mode) | Proxy sharing DB connections; session mode keeps prepared statements working | D16 |
 | Keep-alive | Scheduled cheap query so a free tier does not pause; ours is the uptime cron hitting /readyz | D16 |
 | Public mode | Deployment flag: autonomy capped at 1, execute disabled | D16 |
+| Environment parity in CI | Test the image with the same dependencies production has (a database) | D16 |
+| Startup probe | Cloud Run marks a revision failed if the container never listens; no traffic reaches it | D16 |
 | Readiness gate | Traffic shifts only when /readyz (DB reachable) answers 200 | D16 |
 | Secret Manager / --set-secrets | Versioned secrets injected into Cloud Run at start; never in repo or logs | D16 |

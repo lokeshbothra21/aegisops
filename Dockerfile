@@ -27,6 +27,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl \
 WORKDIR /app
 COPY --from=builder --chown=aegis:aegis /app /app
 COPY --chown=aegis:aegis apps/api/alembic.ini apps/api/alembic.ini
+# runtime config read relative to WORKDIR /app: models, policy, alert rules, targets.
+# (missing until 26 Sep: the agent only reads it once a database exists, so the first
+# deploy against Supabase crashed at startup; the readiness gate kept traffic safe)
+COPY --chown=aegis:aegis config config
 COPY --chmod=755 infra/docker/entrypoint.sh /entrypoint.sh
 ENV PATH=/app/.venv/bin:$PATH PYTHONUNBUFFERED=1 PORT=8080 AEGIS_ENV=prod AEGIS_LOG_JSON=true
 USER aegis
