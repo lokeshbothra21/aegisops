@@ -74,6 +74,8 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - ★ **What happens if the Cloud Run instance dies mid-run?** (Planned) LangGraph checkpoint after each node; the SSE client reconnects and the thread resumes. (ADR-006, ADR-009)
 - **Why WIF over a service-account key?** Minutes-long credentials, issued only to workflows from this exact repository, nothing to leak or rotate. (ADR-012)
 - **What broke on your first deploys and how did you debug?** `--no-traffic` on create; GFE swallowing `/healthz`, proven by header/content-type comparison across paths. (ADR-015)
+- **Why does production reach Postgres through a pooler?** IPv4 from Cloud Run and bounded connections; session mode keeps prepared statements. (Day 16)
+- **How do secrets reach the container?** Secret Manager via `--set-secrets`; accessor role on the runtime SA only.
 - **How do you keep infra at ₹0?** min-instances 0, max 3, registry cleanup, budget alert, no always-on components.
 - **How does a container reach a process on the host?** `host.docker.internal` / `host-gateway`.
 

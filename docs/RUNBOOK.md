@@ -85,7 +85,10 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | Deploy failed at `auth` (WIF) | The provider only trusts `lokeshbothra21/aegisops`. A fork or renamed repo cannot deploy. Check the repo variables `GCP_WIF_PROVIDER` / `GCP_DEPLOY_SA`. |
 | Unexpected GCP bill | Budget alert "aegisops guardrail" (₹500) emails at 50 %, 100 % and forecast. Check `--min-instances` is 0 and Artifact Registry cleanup kept ≤ 5 images. |
 | Redeploy without a code change | Actions → deploy-api → Run workflow (`workflow_dispatch`). |
-| Supabase paused | Keep-alive cron (E11.5) should prevent it; else restore from the dashboard and verify `/readyz`. |
+| Supabase paused | The uptime cron requires `/readyz` every 6 h, which should prevent it (a red uptime run is the alarm). Else restore from the Supabase dashboard and re-run the uptime workflow. |
+| Deploy failed at `/readyz` | The new revision cannot reach Supabase: wrong/rotated password in `aegis-database-url`, project paused, or pooler host/region wrong. Traffic stayed on the old revision. Fix the secret (`gcloud secrets versions add aegis-database-url --data-file=-`) and redeploy. |
+| Rotate a production secret | `printf '%s' "$NEW" \| gcloud secrets versions add <name> --data-file=-`, then Actions → deploy-api → Run workflow. Secrets: `aegis-database-url`, `aegis-admin-token`, `aegis-gemini-api-key`, `aegis-groq-api-key`. | <!-- pragma: allowlist secret -->
+| Migrate Supabase by hand | `AEGIS_DATABASE_URL=<pooler URL with +asyncpg> uv run alembic upgrade head` in `apps/api` (the container also runs it at start). Use the **Session pooler** URL, never the IPv6-only direct host. |
 | Schema change needed | New Alembic migration; CI runs it against a fresh DB; deploy runs `alembic upgrade head` as a pre-start step. |
 | Key leaked | Rotate in the provider, update Secret Manager, redeploy, add a note to `SECURITY.md`. |
 

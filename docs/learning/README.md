@@ -27,3 +27,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [13](day-13-2026-09-24-scenarios-runner-capture.md) | 24 Sep | Scenario catalogue, runner, capture, fixtures, replay command | #26 |
 | [14](day-14-2026-09-25-runs-remediation-approval.md) | 25 Sep | Runs API + SSE, remediation, approval interrupt, policy, cost per run | #27 |
 | [15](day-15-2026-09-25-execute-actions-safety.md) | 25 Sep | Execute node, actions, validation, audit log, post-action verification, structure test | #28 |
+| [16](day-16-2026-09-26-production-database.md) | 26 Sep | Supabase via the pooler, Secret Manager, readiness gate, keep-alive, public mode | #29 |
