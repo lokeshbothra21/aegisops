@@ -54,6 +54,21 @@ POST /scenarios/S1/replay
 
 **Stale run.** On Cloud Run, CPU is throttled to almost nothing when no request is open (ADR-009: the run advances while someone watches its SSE stream). A run nobody watches can stall in `running`. After 10 minutes, far beyond the 180-second agent budget, it stops counting as live, so it cannot lock a visitor or an incident forever.
 
+## The race the deploy found (PR #33)
+PR #32 passed CI, then its deploy failed: the deploy workflow runs the tests again, and two runs crashed with `ForeignKeyViolationError` on `audit_log.run_id`. Production was untouched (the tests gate the image build).
+
+What happened, step by step:
+1. The request inserts the run row: flushed (sent to Postgres) but **not committed**.
+2. `start()` launches the agent as a background task, then the request does a little more work and only then commits.
+3. The agent's first tool call writes an audit row, in **its own session**, pointing at the run.
+4. Postgres runs at **read committed**: other sessions only see committed rows. To the agent's session the run did not exist yet, so the foreign key refused the audit row and the run crashed.
+
+It is a race: it only fails when step 3 beats step 4's commit. It had existed since PR #28 but had never lost; this PR's admission queries made the gap a little wider, and the CI runner was slower that time (81 s vs 13 s for the suite). Against Supabase in Singapore, where every round trip is tens of milliseconds, visitors would have hit it.
+
+Fix: `start()` commits the run before it launches the task (and `decide()` commits before resuming). The commit also releases the admission lock at exactly the right moment, after the insert. Regression test: start a run inside an open request session, then look for it from a second connection; without the fix that returns nothing (`None == 107`), with it the row is there.
+
+Lesson: rows handed to background work must be committed first. A test that passes on a fast laptop does not prove the ordering; a test that asserts the ordering does.
+
 ## Decisions
 - ADR-018: admission in the app, counted in Postgres, with an advisory lock; rejected in-memory counters (per instance), Redis (a new paid service), Cloud Armor (needs a load balancer, and it limits requests rather than runs).
 
@@ -66,4 +81,5 @@ POST /scenarios/S1/replay
 2. *What is a race condition? Give one from your project.* Two visitors take the last daily slot at once; both count 29 and both insert. `pg_advisory_xact_lock` serialises the decision.
 3. *How do you get the client IP behind a proxy, and why not the left-most XFF entry?* The proxy appends the true peer on the right; everything to its left is client-controlled and forgeable.
 4. *Why HMAC and not SHA-256 for the IP?* The IPv4 space is small enough to brute-force a plain hash; a secret key makes it one-way for anyone without the key.
+6. *Tell me about a race condition you fixed.* The run row was flushed but not committed when the agent task started; its first audit insert, from another session, violated the foreign key under read committed. Commit before launching background work; a test reads the row from a second connection.
 5. *What happens when the demo is over its limit?* It serves the last finished run for that incident; a 429 with `Retry-After` only when there is nothing to show.

@@ -9,10 +9,12 @@ import pytest
 from asgi_lifespan import LifespanManager
 from httpx import ASGITransport, AsyncClient
 from pydantic import SecretStr
+from sqlalchemy import text
 
 from aegisops_api.db import create_engine, create_session_factory
 from aegisops_api.incidents.lifecycle import open_incident
 from aegisops_api.main import create_app
+from aegisops_api.models import Incident
 from aegisops_api.settings import Settings
 from aegisops_tools.testing import NOW, delete_scenario, seed_payment_failure
 from tests.conftest import ADMIN_TOKEN
@@ -226,6 +228,24 @@ async def test_reject_returns_the_incident_to_investigating(agent_app) -> None: 
     # a new run may now start
     r2 = await c.post(f"/api/v1/incidents/{incident_id}/runs", json={})
     assert r2.status_code == 202, r2.text
+
+
+async def test_the_run_is_committed_before_the_agent_starts(agent_app) -> None:  # type: ignore[no-untyped-def]
+    """The agent's tasks write rows referencing the run from other sessions; the run must
+    already be visible to them, or the first audit row violates its foreign key."""
+    c, incident_id, _, engine = agent_app
+    manager = c._transport.app.state.runs
+    factory = create_session_factory(engine)
+    async with factory() as request_session:
+        incident = await request_session.get(Incident, incident_id)
+        run = await manager.start(request_session, incident)
+        async with factory() as other:
+            seen = (
+                await other.execute(text("SELECT id FROM runs WHERE id = :r"), {"r": run.id})
+            ).scalar()
+        assert seen == run.id
+    body = await _wait(c, run.id, "awaiting_approval")
+    assert body["error"] is None
 
 
 async def test_run_and_incident_not_found(agent_app) -> None:  # type: ignore[no-untyped-def]
