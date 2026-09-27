@@ -67,7 +67,9 @@ It is a race: it only fails when step 3 beats step 4's commit. It had existed si
 
 Fix: `start()` commits the run before it launches the task (and `decide()` commits before resuming). The commit also releases the admission lock at exactly the right moment, after the insert. Regression test: start a run inside an open request session, then look for it from a second connection; without the fix that returns nothing (`None == 107`), with it the row is there.
 
-Lesson: rows handed to background work must be committed first. A test that passes on a fast laptop does not prove the ordering; a test that asserts the ordering does.
+**Second deploy, second race (PR #34).** With that fixed, the next deploy failed on a different test: the incident was already `resolved` but the `verification` event was missing from the stream. Same shape: post-action verification committed the incident change in one transaction and wrote its event in a second one a moment later; the test read in between. `_pause`, `_finish` and `_fail` had the same order (status, then event). Now every state change and the event describing it are written in **one transaction** (`_stage` adds the event row to the same session; subscribers are notified after the commit). A reader sees both or neither.
+
+Lesson: rows handed to background work must be committed first, and a state change and its record belong in one transaction. A test that passes on a fast laptop does not prove the ordering; a test that asserts the ordering does.
 
 ## Decisions
 - ADR-018: admission in the app, counted in Postgres, with an advisory lock; rejected in-memory counters (per instance), Redis (a new paid service), Cloud Armor (needs a load balancer, and it limits requests rather than runs).

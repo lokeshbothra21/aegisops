@@ -17,6 +17,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Artifact Registry | GCP container image registry; ours has a keep-5 / delete-30-days cleanup policy | D5 |
 | ASGI | Async interface between a Python web app and its server (uvicorn) | D1 |
 | asyncpg | Fast asyncio Postgres driver used by SQLAlchemy | D2 |
+| Atomic state + event | Write a state change and the event describing it in one transaction: both or neither | D17 |
 | Attribute (OTel) | Key/value fact on a resource, scope, span, log or metric point | D3 |
 | Batching | Grouping items into one request; exporter batches ~200–1000 items | D4 |
 | Budget alert | GCP billing alert; ours ₹500 at 50 %, 100 %, forecast | D5 |
