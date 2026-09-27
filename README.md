@@ -15,6 +15,7 @@
 - **Asks before it acts**: every investigation is a run with a live event stream; the agent proposes one of four fixes and pauses; a human approves or rejects over the API, and the policy decides when low-risk, high-confidence fixes may skip the human. Measured live: $0.004 per run at list prices.
 - **Acts only after approval, and checks its work**: the approved fix runs through allowlisted, shell-free actions (flag revert, container restart); 90 s later the triggering rule is re-checked over post-fix data and the incident is resolved or marked failed. Every tool call, decision and action is audited.
 - **Stays inside budgets**: 15 tool calls, 60k tokens, 180 s per run; a breach still produces a partial report.
+- **Safe to leave public**: visitors can replay a scenario and watch the agent live, but only one run at a time each and a daily cap overall (counted in Postgres across instances); past the cap they get the last finished run instead of an error. Visitor runs stop at the proposal: nothing executes.
 - **Runs the same code live and in replay**: `aegis-scenario run S1` injects a fault, measures time-to-detect, reverts and captures the window; `aegis-scenario investigate S1` replays the agent on it with the clock frozen.
 
 **Deliberately not in v1:** writing or merging code patches, Kubernetes, canary deploys, Slack/PagerDuty integrations, multi-tenancy, model fine-tuning.

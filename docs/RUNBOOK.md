@@ -109,7 +109,10 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | Gemini `503 high demand` / timeouts | Router falls back to Groq per node (`model_fallback` with the exception type). Provider timeout is 30 s. Frequent = check Google AI Studio status; consider swapping primary/secondary in `config/models.yaml` temporarily. |
 | Start and watch a run over the API | `curl -X POST localhost:8000/api/v1/incidents/<id>/runs -d '{}' -H 'content-type: application/json'` → 202 with the run id; `curl -N localhost:8000/api/v1/runs/<run>/events` streams node events (reconnect with `?after=<last seq>`). |
 | Run paused at `awaiting_approval` | `POST /api/v1/runs/<run>/approve` or `/reject` with `X-Admin-Token` and `{"by": "...", "note": "..."}`. Approve → incident `remediating`; reject → `investigating` and a new run may start. |
-| `409 Run already active` | One running or awaiting-approval run per incident. Decide the pending one first. |
+| `409 Run already active` | One running (started < 10 min ago) or awaiting-approval run per incident. Decide the pending one first; a stalled `running` run stops blocking after 10 min. |
+| Visitor gets `429 One run at a time` | Public mode: that visitor already has a running run (the detail names it); watch it at `/runs/<id>/events`. Admin token bypasses. |
+| `429 Daily run limit reached` / `served: "cached"` | Public cap (`AEGIS_PUBLIC_DAILY_RUN_CAP`, default 30 per UTC day) is spent; cached = last finished run of that incident. Today's count: `select count(*) from runs where requested_by like 'public:%' and started_at >= date_trunc('day', now() at time zone 'utc');`. Raise the cap with a Cloud Run env var only if the provider quota allows. |
+| Many visitors look like one (or one like many) | Client IP is the right-most `X-Forwarded-For` entry when `AEGIS_TRUST_FORWARDED_FOR=true` (direct Cloud Run). Behind an external load balancer use the second-from-right; locally leave it false. |
 | `503 Agent disabled` on /runs | `AEGIS_AGENT_ENABLED=false`, or the checkpointer could not reach Postgres at startup (`agent.checkpointer_unavailable` in logs; expected on Cloud Run until Supabase). |
 | Same scenario, very different confidence run to run | Model non-determinism and which provider answered (see `model` on the run). Verified confidence is what the policy uses; compare several runs, never one. |
 | Approved fix did nothing | Check the remediation's `outcome` (`GET /runs/<id>`): `rejected:` = validation (not allowlisted in `config/policy.yaml`); `no live backend configured` = `AEGIS_FLAGD_CONFIG_PATH`/`AEGIS_DOCKER_SOCKET` unset; `not supported by the local demo target` = scale/rollback. Every attempt is in `audit_log`. |
@@ -117,5 +120,5 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | Who changed what? | `select ts, node, tool, actor, ok, args from audit_log where run_id = <run> order by id;` Actors: `agent`, `admin:<name>`, `policy:auto`. |
 | Drift test complains about `checkpoint*` tables | They belong to LangGraph's saver, not Alembic; `include_object` in `models/base.py` must skip them. |
 | Gemini 429 / quota exhausted | Router falls back to Groq; if both exhausted, public mode serves cached runs; check Langfuse for the burst source. |
-| Cost spike | Check `runs` for tool_calls/tokens outliers; lower the global daily cap in config; rotate the key if abused. |
+| Cost spike | Check `runs` for tool_calls/tokens outliers and `requested_by` for one visitor dominating; lower `AEGIS_PUBLIC_DAILY_RUN_CAP`; rotate the key if abused. |
 | Checkpoint/resume broken | Inspect `langgraph_*` tables for the thread_id; `POST /incidents/{id}/runs` restarts a fresh thread. |

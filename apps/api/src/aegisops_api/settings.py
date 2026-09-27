@@ -72,6 +72,15 @@ class Settings(BaseSettings):
         default=False,
         description="Public replay deployment: max autonomy 1, execution disabled (§10.3).",
     )
+    public_daily_run_cap: int = Field(
+        default=30,
+        ge=0,
+        description="New visitor runs per UTC day in public mode; then the last run is served.",
+    )
+    trust_forwarded_for: bool = Field(
+        default=False,
+        description="Take the client IP from the right-most X-Forwarded-For entry (Cloud Run).",
+    )
     recorded_llm_path: str | None = Field(
         default=None,
         description="Cassette file: replay model outputs instead of calling providers (tests/CI).",
