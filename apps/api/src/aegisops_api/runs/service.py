@@ -103,7 +103,11 @@ class RunManager:
         session.add(run)
         if incident.status is IncidentStatus.open:
             transition(incident, IncidentStatus.investigating)
-        await session.flush()
+        # Commit before the task starts: the agent writes audit_log and run_events rows that
+        # reference this run from its own sessions, and an uncommitted run is invisible to
+        # them (foreign-key violation, run crashed). Seen in CI on 27 Sep; more likely the
+        # farther the database is. Also releases the admission lock at the right moment.
+        await session.commit()
         handle = RunHandle(run_id=run.id, thread_id=thread_id, proposal_only=proposal_only)
         self.handles[run.id] = handle
         ctx = ToolContext(
@@ -155,7 +159,7 @@ class RunManager:
                 if decision is Decision.approved
                 else IncidentStatus.investigating,
             )
-        await session.flush()
+        await session.commit()  # the resumed task reads the decision from its own session
         handle = self.handles.get(run.id) or RunHandle(
             run_id=run.id, thread_id=run.thread_id, seq=await self._last_seq(session, run.id)
         )

@@ -45,6 +45,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Fault injection | Deliberately breaking a system (flag toggle) to test response | D4 |
 | Feature flag / flagd | Runtime switch; flagd serves flags from a JSON file it hot-reloads | D0 |
 | Fixture (test) | Reusable test data/setup | D3 |
+| Flush vs commit | Flush sends SQL inside the open transaction; only commit makes it visible to others | D17 |
 | Gauge / Sum / Histogram | OTel metric types: value now / counter / bucketed distribution | D3 |
 | GFE (Google Frontend) | Google's edge proxy for run.app; reserves `/healthz` | D5 |
 | GitHub Actions | GitHub CI/CD: workflows → jobs → steps, triggered by events | D5 |
@@ -94,6 +95,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Pure function | No I/O; output depends only on input (`convert.py`) | D3 |
 | Pydantic | Validation from type hints; every boundary is a model | D1 |
 | Race condition | Result depends on timing, e.g. two instances both take the last slot | D17 |
+| Read committed | Postgres default isolation: a session sees only rows other sessions have committed | D17 |
 | Rebase / force-with-lease | Replay commits on a new base; safe force push | D3 |
 | Receiver (collector) | Input of a pipeline (otlp, docker_stats) | D4 |
 | Replay mode | Serve captured telemetry by `scenario_id`; same code path as live | D0 |
