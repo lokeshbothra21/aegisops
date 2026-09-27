@@ -210,31 +210,43 @@ class RunManager:
         n = await session.scalar(select(func.max(RunEvent.seq)).where(RunEvent.run_id == run_id))
         return int(n or 0)
 
-    async def _emit(
-        self, handle: RunHandle, node: str, type_: str, payload: dict[str, Any]
-    ) -> None:
+    def _stage(
+        self, handle: RunHandle, s: AsyncSession, node: str, type_: str, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Add an event row to `s`; the caller commits it together with the state change it
+        describes (a reader never sees "resolved" without its verification event), then
+        publishes. Found in CI on 27 Sep: state committed first, event a moment later."""
         handle.seq += 1
-        event = {
+        now = datetime.now(UTC)
+        s.add(
+            RunEvent(
+                run_id=handle.run_id, seq=handle.seq, node=node, type=type_, payload=payload, ts=now
+            )
+        )
+        return {
             "seq": handle.seq,
             "node": node,
             "type": type_,
             "payload": payload,
-            "ts": datetime.now(UTC).isoformat(),
+            "ts": now.isoformat(),
         }
-        async with self.factory() as s:
-            s.add(
-                RunEvent(
-                    run_id=handle.run_id,
-                    seq=handle.seq,
-                    node=node,
-                    type=type_,
-                    payload=payload,
-                    ts=datetime.now(UTC),
-                )
-            )
-            await s.commit()
+
+    def _publish(self, handle: RunHandle, *events: dict[str, Any], end: bool = False) -> None:
         for q in list(handle.subscribers):
-            q.put_nowait(event)
+            for event in events:
+                q.put_nowait(event)
+        if end:
+            handle.done = True
+            for q in list(handle.subscribers):
+                q.put_nowait(None)
+
+    async def _emit(
+        self, handle: RunHandle, node: str, type_: str, payload: dict[str, Any]
+    ) -> None:
+        async with self.factory() as s:
+            event = self._stage(handle, s, node, type_, payload)
+            await s.commit()
+        self._publish(handle, event)
 
     def _cost(self, model: str, tokens_in: int, tokens_out: int) -> float:
         p = self.prices.get(model) or {}
@@ -325,32 +337,40 @@ class RunManager:
             incident = await s.get(Incident, run.incident_id)
             if incident is not None and incident.status is IncidentStatus.investigating:
                 transition(incident, IncidentStatus.awaiting_approval)
+            if handle.proposal_only:
+                events = [
+                    self._stage(
+                        handle,
+                        s,
+                        "approval",
+                        "approval_not_offered",
+                        {
+                            "remediation": rem,
+                            "policy": intr.get("policy"),
+                            "reason": "public replay: the proposal is shown; approval needs the "
+                            "admin",
+                        },
+                    ),
+                    self._stage(
+                        handle,
+                        s,
+                        "run",
+                        "end",
+                        {"status": run.status.value, "duration_ms": run.duration_ms},
+                    ),
+                ]
+            else:
+                events = [
+                    self._stage(
+                        handle,
+                        s,
+                        "approval",
+                        "approval_requested",
+                        {"remediation": rem, "policy": intr.get("policy")},
+                    )
+                ]
             await s.commit()
-            status_, duration = run.status, run.duration_ms
-        if handle.proposal_only:
-            await self._emit(
-                handle,
-                "approval",
-                "approval_not_offered",
-                {
-                    "remediation": rem,
-                    "policy": intr.get("policy"),
-                    "reason": "public replay: the proposal is shown; approval needs the admin",
-                },
-            )
-            await self._emit(
-                handle, "run", "end", {"status": status_.value, "duration_ms": duration}
-            )
-        else:
-            await self._emit(
-                handle,
-                "approval",
-                "approval_requested",
-                {"remediation": rem, "policy": intr.get("policy")},
-            )
-        handle.done = True
-        for q in list(handle.subscribers):
-            q.put_nowait(None)
+        self._publish(handle, *events, end=True)
 
     async def _finish(
         self, handle: RunHandle, last: dict[str, Any], tools: Any, t0: float, models: set[str]
@@ -412,10 +432,15 @@ class RunManager:
                     transition(incident, IncidentStatus.failed)
             await s.flush()
             rem_id = rem.id if rem is not None else None
+            end = self._stage(
+                handle,
+                s,
+                "run",
+                "end",
+                {"status": run.status.value, "duration_ms": run.duration_ms},
+            )
             await s.commit()
-        await self._emit(
-            handle, "run", "end", {"status": run.status.value, "duration_ms": run.duration_ms}
-        )
+        self._publish(handle, end)
         if verify and rem_id is not None:
             task = asyncio.create_task(
                 self._verify(handle, run.incident_id, rem_id, execution or {}),
@@ -496,13 +521,15 @@ class RunManager:
                 incident.summary = f"{incident.summary} | resolved by {rem.action.value}"
             elif cleared is False:
                 transition(incident, IncidentStatus.failed)
+            event = self._stage(
+                handle,
+                s,
+                "verification",
+                "cleared" if cleared else ("still_breaching" if cleared is False else "unknown"),
+                {"alert_cleared": cleared, "value_after": value},
+            )
             await s.commit()
-        await self._emit(
-            handle,
-            "verification",
-            "cleared" if cleared else ("still_breaching" if cleared is False else "unknown"),
-            {"alert_cleared": cleared, "value_after": value},
-        )
+        self._publish(handle, event)
 
     async def _fail(self, handle: RunHandle, error: str) -> None:
         async with self.factory() as s:
@@ -512,8 +539,6 @@ class RunManager:
                 incident = await s.get(Incident, run.incident_id)
                 if incident is not None and incident.status is IncidentStatus.investigating:
                     transition(incident, IncidentStatus.failed)
-                await s.commit()
-        await self._emit(handle, "run", "failed", {"error": error})
-        handle.done = True
-        for q in list(handle.subscribers):
-            q.put_nowait(None)
+            event = self._stage(handle, s, "run", "failed", {"error": error})
+            await s.commit()
+        self._publish(handle, event, end=True)
