@@ -60,6 +60,7 @@ class RunHandle:
     task: asyncio.Task[None] | None = None
     seq: int = 0
     done: bool = False
+    proposal_only: bool = False  # public visitor run: end at the proposal, never pause
 
 
 @dataclass
@@ -80,7 +81,14 @@ class RunManager:
     # --- public API ---------------------------------------------------------------
 
     async def start(
-        self, session: AsyncSession, incident: Incident, *, model: str = "", variant: str = "D"
+        self,
+        session: AsyncSession,
+        incident: Incident,
+        *,
+        model: str = "",
+        variant: str = "D",
+        requested_by: str | None = None,
+        proposal_only: bool = False,
     ) -> Run:
         thread_id = f"inc-{incident.id}-{uuid4().hex[:12]}"
         run = Run(
@@ -90,12 +98,13 @@ class RunManager:
             variant=variant,
             status=RunStatus.running,
             started_at=datetime.now(UTC),
+            requested_by=requested_by,
         )
         session.add(run)
         if incident.status is IncidentStatus.open:
             transition(incident, IncidentStatus.investigating)
         await session.flush()
-        handle = RunHandle(run_id=run.id, thread_id=thread_id)
+        handle = RunHandle(run_id=run.id, thread_id=thread_id, proposal_only=proposal_only)
         self.handles[run.id] = handle
         ctx = ToolContext(
             scenario_id=incident.scenario_id,
@@ -289,8 +298,15 @@ class RunManager:
         async with self.factory() as s:
             run = await s.get(Run, handle.run_id)
             assert run is not None
-            run.status = RunStatus.awaiting_approval
             run.root_cause = intr.get("root_cause")
+            if handle.proposal_only:
+                # nobody can approve on the public deployment: a paused run would stay
+                # active forever and lock its visitor out, so the run ends at the proposal
+                run.status = RunStatus.succeeded
+                run.finished_at = datetime.now(UTC)
+                run.duration_ms = int((run.finished_at - run.started_at).total_seconds() * 1000)
+            else:
+                run.status = RunStatus.awaiting_approval
             s.add(
                 Remediation(
                     run_id=run.id,
@@ -299,19 +315,35 @@ class RunManager:
                     risk=Risk(rem.get("risk", "low")),
                     confidence=float(rem.get("confidence", 0.0)),
                     rationale=rem.get("rationale"),
-                    decision=Decision.pending,
+                    decision=Decision.not_offered if handle.proposal_only else Decision.pending,
                 )
             )
             incident = await s.get(Incident, run.incident_id)
             if incident is not None and incident.status is IncidentStatus.investigating:
                 transition(incident, IncidentStatus.awaiting_approval)
             await s.commit()
-        await self._emit(
-            handle,
-            "approval",
-            "approval_requested",
-            {"remediation": rem, "policy": intr.get("policy")},
-        )
+            status_, duration = run.status, run.duration_ms
+        if handle.proposal_only:
+            await self._emit(
+                handle,
+                "approval",
+                "approval_not_offered",
+                {
+                    "remediation": rem,
+                    "policy": intr.get("policy"),
+                    "reason": "public replay: the proposal is shown; approval needs the admin",
+                },
+            )
+            await self._emit(
+                handle, "run", "end", {"status": status_.value, "duration_ms": duration}
+            )
+        else:
+            await self._emit(
+                handle,
+                "approval",
+                "approval_requested",
+                {"remediation": rem, "policy": intr.get("policy")},
+            )
         handle.done = True
         for q in list(handle.subscribers):
             q.put_nowait(None)

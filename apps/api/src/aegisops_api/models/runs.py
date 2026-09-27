@@ -42,6 +42,7 @@ class Decision(StrEnum):
     approved = "approved"
     rejected = "rejected"
     auto = "auto"
+    not_offered = "not_offered"  # public replay: proposal shown, no human can approve here
 
 
 class Run(TimestampedRow, Base):
@@ -65,8 +66,13 @@ class Run(TimestampedRow, Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     root_cause: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
     error: Mapped[str | None] = mapped_column(Text)
+    # admin | local | public:<hmac of IP> (E9.4); null for runs before 0007
+    requested_by: Mapped[str | None] = mapped_column(String(64))
 
-    __table_args__ = (Index("ix_runs_incident", "incident_id"),)
+    __table_args__ = (
+        Index("ix_runs_incident", "incident_id"),
+        Index("ix_runs_requested_started", "requested_by", "started_at"),
+    )
 
 
 class RunEvent(TimestampedRow, Base):

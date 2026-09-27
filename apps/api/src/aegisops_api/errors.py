@@ -48,17 +48,27 @@ def problem_response(
 class ProblemError(Exception):
     """Raise from any layer to answer with a specific problem+json (thin routes)."""
 
-    def __init__(self, status_code: int, title: str, detail: str | None = None) -> None:
+    def __init__(
+        self,
+        status_code: int,
+        title: str,
+        detail: str | None = None,
+        *,
+        headers: Mapping[str, str] | None = None,
+    ) -> None:
         super().__init__(detail or title)
         self.status_code = status_code
         self.title = title
         self.detail = detail
+        self.headers = headers
 
 
 def install_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ProblemError)
     async def _problem(request: Request, exc: ProblemError) -> JSONResponse:
-        return problem_response(request, exc.status_code, exc.title, exc.detail)
+        return problem_response(
+            request, exc.status_code, exc.title, exc.detail, headers=exc.headers
+        )
 
     @app.exception_handler(StarletteHTTPException)
     async def _http(request: Request, exc: StarletteHTTPException) -> JSONResponse:

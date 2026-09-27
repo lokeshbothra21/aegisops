@@ -1,23 +1,38 @@
-"""Runs (§7): start, summary, SSE event stream, approve / reject (🔒)."""
+"""Runs (§7): start, public scenario replay, summary, SSE event stream, approve / reject (🔒).
+
+Starting a run goes through admission (E9.4, `runs/limits.py`): visitors on the public
+deployment are limited, and past the daily cap they are served the last finished run.
+`served` says which: `new` (202), `joined` (someone's live run, 200) or `cached` (200).
+"""
 
 from __future__ import annotations
 
 import json
 from collections.abc import AsyncIterator
-from datetime import datetime
-from typing import Annotated, Any
+from datetime import UTC, datetime
+from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, status
+from fastapi import APIRouter, Depends, Query, Request, Response, status
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sse_starlette.sse import EventSourceResponse
 
 from aegisops_api.db import get_session
 from aegisops_api.errors import ProblemError
-from aegisops_api.models import Decision, Incident, Remediation, Run, RunEvent, RunStatus
+from aegisops_api.models import (
+    Decision,
+    Incident,
+    Remediation,
+    Run,
+    RunEvent,
+    RunStatus,
+    Scenario,
+)
 from aegisops_api.routes.admin import require_admin
+from aegisops_api.runs.limits import STALE_AFTER, Admission, admit
 from aegisops_api.runs.service import RunManager
+from aegisops_api.settings import Settings
 
 router = APIRouter(prefix="/api/v1", tags=["runs"])
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -70,6 +85,7 @@ class RunOut(BaseModel):
     root_cause: dict[str, Any] | None
     error: str | None
     remediation: RemediationOut | None = None
+    served: Literal["new", "joined", "cached"] = "new"
 
     model_config = {"from_attributes": True}
 
@@ -79,7 +95,9 @@ class DecisionIn(BaseModel):
     note: str = Field(default="", max_length=400)
 
 
-async def _run_out(session: AsyncSession, run: Run) -> RunOut:
+async def _run_out(
+    session: AsyncSession, run: Run, served: Literal["new", "joined", "cached"] = "new"
+) -> RunOut:
     rem = (
         await session.scalars(
             select(Remediation).where(Remediation.run_id == run.id).order_by(Remediation.id.desc())
@@ -87,32 +105,97 @@ async def _run_out(session: AsyncSession, run: Run) -> RunOut:
     ).first()
     out = RunOut.model_validate(run)
     out.remediation = RemediationOut.model_validate(rem) if rem else None
+    out.served = served
     return out
+
+
+async def _active_run(session: AsyncSession, incident_id: int) -> Run | None:
+    """Paused for approval, or running and recent (a stalled run older than STALE_AFTER
+    no longer blocks the incident)."""
+    return (
+        await session.scalars(
+            select(Run).where(
+                Run.incident_id == incident_id,
+                or_(
+                    Run.status == RunStatus.awaiting_approval,
+                    and_(
+                        Run.status == RunStatus.running,
+                        Run.started_at > datetime.now(UTC) - STALE_AFTER,
+                    ),
+                ),
+            )
+        )
+    ).first()
+
+
+async def _admitted_run(
+    session: AsyncSession, request: Request, response: Response, incident: Incident, body: StartRun
+) -> RunOut:
+    settings: Settings = request.app.state.settings
+    admission: Admission = await admit(session, request, settings, incident)
+    if admission.cached is not None:
+        response.status_code = status.HTTP_200_OK
+        return await _run_out(session, admission.cached, "cached")
+    run = await manager(request).start(
+        session,
+        incident,
+        model=body.model,
+        variant=body.variant,
+        requested_by=admission.requested_by,
+        proposal_only=admission.public,
+    )
+    return await _run_out(session, run)
 
 
 @router.post(
     "/incidents/{incident_id}/runs", response_model=RunOut, status_code=status.HTTP_202_ACCEPTED
 )
-async def start_run(incident_id: int, body: StartRun, request: Request, session: Session) -> RunOut:
+async def start_run(
+    incident_id: int, body: StartRun, request: Request, response: Response, session: Session
+) -> RunOut:
     incident = await session.get(Incident, incident_id)
     if incident is None:
         raise ProblemError(status.HTTP_404_NOT_FOUND, "Incident not found", str(incident_id))
-    active = (
-        await session.scalars(
-            select(Run).where(
-                Run.incident_id == incident_id,
-                Run.status.in_([RunStatus.running, RunStatus.awaiting_approval]),
-            )
-        )
-    ).first()
+    active = await _active_run(session, incident_id)
     if active is not None:
         raise ProblemError(
             status.HTTP_409_CONFLICT,
             "Run already active",
             f"run {active.id} is {active.status.value}",
         )
-    run = await manager(request).start(session, incident, model=body.model, variant=body.variant)
-    return await _run_out(session, run)
+    return await _admitted_run(session, request, response, incident, body)
+
+
+@router.post("/scenarios/{key}/replay", response_model=RunOut, status_code=status.HTTP_202_ACCEPTED)
+async def replay_scenario(
+    key: str, request: Request, response: Response, session: Session
+) -> RunOut:
+    """The public demo button: investigate a captured scenario's incident. If a run on it is
+    already live, join that one (free, and everyone watches the same stream)."""
+    scenario = (await session.scalars(select(Scenario).where(Scenario.key == key))).first()
+    if scenario is None:
+        raise ProblemError(status.HTTP_404_NOT_FOUND, "Scenario not found", key)
+    incident = (
+        await session.scalars(
+            select(Incident)
+            .where(Incident.scenario_id == key)
+            .order_by(
+                (Incident.service == (scenario.expected_service or "")).desc(),
+                Incident.opened_at,
+                Incident.id,
+            )
+            .limit(1)
+        )
+    ).first()
+    if incident is None:
+        raise ProblemError(
+            status.HTTP_404_NOT_FOUND, "Scenario has no incident", f"{key} captured no incident"
+        )
+    active = await _active_run(session, incident.id)
+    if active is not None:
+        response.status_code = status.HTTP_200_OK
+        return await _run_out(session, active, "joined")
+    return await _admitted_run(session, request, response, incident, StartRun())
 
 
 @router.get("/runs/{run_id}", response_model=RunOut)

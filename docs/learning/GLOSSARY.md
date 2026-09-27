@@ -4,8 +4,11 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 
 | Term | Meaning | Day |
 |---|---|---|
+| 429 Too Many Requests | HTTP status for "over a limit"; `Retry-After` says how many seconds to wait | D17 |
 | Ablation | Removing one component to measure its contribution; variants A/B/C/D of the agent | D0 |
+| Admission control | The gate before work starts that applies limits; we limit runs, not requests | D17 |
 | ADR | Architecture Decision Record: context, decision, alternatives, consequences, one page | D0 |
+| Advisory lock | Application-named Postgres lock; `pg_advisory_xact_lock` releases at transaction end | D17 |
 | Agent (LLM) | A program where a model picks tools and conclusions step by step within a budget | D0 |
 | Alembic | Schema migration tool for SQLAlchemy; `upgrade head` applies versioned migrations | D2 |
 | AnyValue | OTLP's tagged union for attribute values (string/int/double/bool/bytes/array/kvlist) | D3 |
@@ -18,6 +21,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Batching | Grouping items into one request; exporter batches ~200–1000 items | D4 |
 | Budget alert | GCP billing alert; ours ₹500 at 50 %, 100 %, forecast | D5 |
 | Cache (CI) | Reused files across runs keyed on a hash (uv.lock, Docker layers) | D5 |
+| Cached-run fallback | Past the cap, serve the incident's last finished run instead of an error | D17 |
 | CodeQL | GitHub semantic code analysis for security bugs; Python + workflow files | D5 |
 | Composite index | Index over several columns; leading column must be in the filter | D2 |
 | Concurrency group | Cancels or serialises workflow runs on the same ref | D5 |
@@ -49,6 +53,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Health check (container) | Docker probe (`pg_isready`) gating `--wait` | D2 |
 | Held-out set | Test cases never used during tuning; S9–S12 | D0 |
 | HITL | Human-in-the-loop: approval node interrupts the graph | D0 |
+| HMAC | Hash with a secret key; stored visitor ids cannot be reversed by hashing every IPv4 | D17 |
 | host.docker.internal | Hostname resolving to the host from inside a container | D4 |
 | IAM role / service account | Google permission bundles / non-human identities | D5 |
 | Integration test | Test against the real Postgres container | D2 |
@@ -88,6 +93,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Protobuf | Binary schema-based serialisation; OTLP's native format | D3 |
 | Pure function | No I/O; output depends only on input (`convert.py`) | D3 |
 | Pydantic | Validation from type hints; every boundary is a model | D1 |
+| Race condition | Result depends on timing, e.g. two instances both take the last slot | D17 |
 | Rebase / force-with-lease | Replay commits on a new base; safe force push | D3 |
 | Receiver (collector) | Input of a pipeline (otlp, docker_stats) | D4 |
 | Replay mode | Serve captured telemetry by `scenario_id`; same code path as live | D0 |
@@ -107,6 +113,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Span / trace | One operation / the tree of spans for one request | D0 |
 | Span kind / status / events / links | SERVER/CLIENT/…; UNSET/OK/ERROR; timestamped annotations; cross-trace refs | D3 |
 | Stacked PR | PR based on an unmerged branch; GitHub closes it when the base is deleted | D3 |
+| Stale run | `running` > 10 min: stalled (CPU throttled with no open request); stops counting | D17 |
 | structlog | Structured (key=value / JSON) logging | D1 |
 | Supabase | Hosted Postgres free tier for prod; pauses after 7 idle days | D2 |
 | Surrogate key | `id bigserial` unrelated to the data | D2 |
@@ -248,3 +255,4 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Startup probe | Cloud Run marks a revision failed if the container never listens; no traffic reaches it | D16 |
 | Readiness gate | Traffic shifts only when /readyz (DB reachable) answers 200 | D16 |
 | Secret Manager / --set-secrets | Versioned secrets injected into Cloud Run at start; never in repo or logs | D16 |
+| X-Forwarded-For | Proxy header listing client IPs; only the right-most, proxy-appended entry is trusted | D17 |
