@@ -2,7 +2,7 @@
 # builder; the runtime stage is python:3.13-slim with only that venv, non-root, port 8080.
 # Build context is the repo root (uv workspace: apps/api + packages/*).
 
-FROM python:3.13-slim AS builder
+FROM python:3.14-slim AS builder
 COPY --from=ghcr.io/astral-sh/uv:0.12.13 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy UV_PYTHON_DOWNLOADS=never UV_FROZEN=1
 WORKDIR /app
@@ -20,7 +20,7 @@ COPY packages packages
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --all-packages --no-dev
 
-FROM python:3.13-slim AS runtime
+FROM python:3.14-slim AS runtime
 RUN apt-get update && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 1001 --create-home aegis
