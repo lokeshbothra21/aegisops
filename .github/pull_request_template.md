@@ -8,6 +8,7 @@
 
 ## Checklist
 - [ ] `make check` green locally
+- [ ] Every commit signed off (`git commit -s`, DCO: see CONTRIBUTING.md)
 - [ ] Tests added/updated for the level in PROJECT.md §14.4
 - [ ] Docs touched if behaviour changed (README / ARCHITECTURE / RUNBOOK)
 - [ ] Migration included if schema changed

@@ -92,6 +92,7 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - ★ **How do you rate-limit a public AI demo across several instances?** Count in the shared database (the `runs` rows already hold requester, status, start time), make check-then-insert atomic with `pg_advisory_xact_lock`, one running run per visitor, a daily cap, then serve the last finished run. (Day 17, ADR-018)
 - **How do you get the client IP behind Cloud Run?** Right-most `X-Forwarded-For` entry (appended by Google); left entries are client-supplied and forgeable. Stored only as an HMAC. (Day 17)
 - **Why does Langfuse get its own TracerProvider?** Isolation: only agent spans go to Langfuse; the API's HTTP/SQL spans (E8.2) go to our collector; neither library sets the other's sampling. (Day 18)
+- **How do you take security reports on a public project?** Private vulnerability reporting, response times you can keep, and a scope written from your own threat model (approval bypass, working prompt injection, admission bypass). (Day 19)
 - **Where do secrets live?** Never in the repo; env/Secret Manager in prod; GitHub variables only for non-secret ids.
 
 ## Evaluation (planned, Weeks 4–11)
@@ -108,3 +109,6 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Tell me about a bug your tests missed.** The job runner returned from inside `async for` over a session generator, closing it before the commit; ticks logged success but persisted nothing. Caught by verifying live from a second connection; fixed with `@asynccontextmanager` and a read-back regression test. (Day 7)
 - **How do you work?** Plan first (PROJECT.md), one feature per PR with its ID, squash merges, ADRs for decisions, learning log per day, runbook grows with each incident we hit ourselves.
 - **A mistake you made and fixed?** Stacked PR #3 closed by GitHub on base-branch deletion; rebased and re-opened as #4; rule recorded in ADR-011.
+- **How did you make the repo ready for outside contributors?** Community health files (CONTRIBUTING, SECURITY, code of conduct), a setup needing only Postgres because model calls replay from cassettes, issue forms with required repro steps, labelled starter issues with a definition of done, a sign-off check. (Day 19)
+- **DCO or CLA?** DCO: per-commit provenance at almost no friction, inbound = outbound under Apache-2.0. A CLA allows relicensing but adds a legal step where newcomers drop off; open core does not need it. (Day 19, ADR-020)
+- **How would you commercialise an Apache-2.0 project?** Open core or hosting, in separate code you own; anyone else may host it too, which is the price of the trust a permissive licence earns. (Day 19)

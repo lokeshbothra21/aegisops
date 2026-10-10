@@ -95,7 +95,7 @@ uv run aegis-investigate ... --recorded packages/agent/tests/cassettes/s1_paymen
 uv run aegis-telemetry                         # the read tools as an MCP server (stdio)
 curl -X POST localhost:8000/api/v1/incidents/<id>/runs -d '{}' -H 'content-type: application/json'   # start a run
 curl -N localhost:8000/api/v1/runs/<run>/events   # live SSE stream; approve with POST /runs/<run>/approve
-make check                                     # lint, types, 164 tests against Postgres (same as CI)
+make check                                     # lint, types, 181 tests against Postgres (same as CI)
 ```
 
 Run a scenario end to end and replay it:
@@ -115,7 +115,7 @@ Shard ingest by service and sample harder at the collector; keep the span-metric
 
 ## Tech stack
 
-Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (164 tests) · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
+Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (181 tests) · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
 
 ## Repository map
 
@@ -130,6 +130,10 @@ Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 +
 | `docs/PROJECT.md` | The master plan: requirements, schedule, changelog |
 | `docs/ARCHITECTURE.md` · `docs/RUNBOOK.md` · `docs/adr/` · `docs/learning/` | Living architecture, operations, decisions, day-by-day teaching log |
 
+## Contributing
+
+Contributions are welcome, from a typo to a new fault scenario. Start with [`CONTRIBUTING.md`](CONTRIBUTING.md): setup needs only Docker and Postgres (model calls in tests are replayed, so no API keys), and issues labelled [`good first issue`](https://github.com/lokeshbothra21/aegisops/labels/good%20first%20issue) say which files to touch and what done means. Commits are signed off under the [DCO](CONTRIBUTING.md#sign-your-commits-dco). Security problems go through [`SECURITY.md`](SECURITY.md), privately.
+
 ## License
 
-Apache-2.0
+Apache-2.0. Contributions are accepted under the same licence ([ADR-020](docs/adr/ADR-020-dco-not-cla.md)).

@@ -1,0 +1,53 @@
+name: Bug report
+description: Something does not work as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Security problems go through [SECURITY.md](https://github.com/lokeshbothra21/aegisops/blob/main/SECURITY.md), not here.**
+        Never paste API keys, tokens or real customer data; redact them.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. make db-up && make db-migrate
+        2. make api
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Ingest (OTLP)
+        - Alerting / incidents
+        - Agent / investigation
+        - Tools / MCP server
+        - Runs, approval, actions
+        - Scenarios / bench
+        - Deploy / CI
+        - Docs
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Relevant log lines, the API's problem+json response, or a run id. Redact secrets.
+      render: text
+  - type: input
+    id: version
+    attributes:
+      label: Commit or environment
+      placeholder: "e.g. main @ 9bc1b7d, macOS 15 + OrbStack, Python 3.13.5"

@@ -1,0 +1,37 @@
+# Every commit in a pull request must carry a DCO sign-off (ADR-020, CONTRIBUTING.md).
+# Reads the PR's commits through the API: no checkout, no third-party action, read-only token.
+name: dco
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  sign-off:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: github.actor != 'dependabot[bot]'
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Every commit has Signed-off-by
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          missing=$(gh api --paginate "repos/$REPO/pulls/$PR/commits" --jq '
+            .[]
+            | select(.author.login != "dependabot[bot]")
+            | select(.commit.message | test("(?m)^Signed-off-by: .+ <.+>$") | not)
+            | .sha[0:7] + " " + (.commit.message | split("\n")[0])')
+          if [ -n "$missing" ]; then
+            echo "::error::Commits without a DCO sign-off. Fix: git rebase --signoff origin/main && git push --force-with-lease"
+            echo "$missing"
+            exit 1
+          fi
+          echo "All commits are signed off."

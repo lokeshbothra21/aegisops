@@ -23,7 +23,10 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Budget alert | GCP billing alert; ours ₹500 at 50 %, 100 %, forecast | D5 |
 | Cache (CI) | Reused files across runs keyed on a hash (uv.lock, Docker layers) | D5 |
 | Cached-run fallback | Past the cap, serve the incident's last finished run instead of an error | D17 |
+| CLA (Contributor Licence Agreement) | A signed grant of rights from contributor to maintainer; allows relicensing, adds friction | D19 |
+| Code of conduct | Published rules for behaviour in project spaces and how reports are handled; we adopt Contributor Covenant 2.1 | D19 |
 | CodeQL | GitHub semantic code analysis for security bugs; Python + workflow files | D5 |
+| Community health files | CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue/PR templates: GitHub surfaces them and newcomers look for them | D19 |
 | Composite index | Index over several columns; leading column must be in the filter | D2 |
 | Concurrency group | Cancels or serialises workflow runs on the same ref | D5 |
 | Connection pool | Reused DB connections; `pool_pre_ping` detects dead ones | D2 |
@@ -31,7 +34,9 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Content-Encoding gzip | Compressed request body; server must inflate; check size before and after | D3 |
 | Context propagation | OTel keeps the current span in a contextvar that follows `await`; children nest automatically | D18 |
 | Conventional Commits | `type(scope): message` commit format | D1 |
+| Coordinated disclosure | Reporter tells the maintainer privately, the fix ships, then the issue is published | D19 |
 | Coverage | Share of code lines executed by tests | D3 |
+| DCO (Developer Certificate of Origin) | A `Signed-off-by:` line per commit certifying you may submit the code under the project licence | D19 |
 | Decorator pattern | Wrap an object in one with the same interface that adds behaviour (`TracedLLM` records, delegates) | D18 |
 | Dependabot | GitHub bot for vulnerability alerts and scheduled dependency-update PRs | D5 |
 | Dependency review | PR check that blocks vulnerable or badly-licensed new dependencies | D5 |
@@ -56,6 +61,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | GFE (Google Frontend) | Google's edge proxy for run.app; reserves `/healthz` | D5 |
 | GitHub Actions | GitHub CI/CD: workflows → jobs → steps, triggered by events | D5 |
 | GitHub variables vs secrets | Non-secret config vs encrypted, masked values | D5 |
+| Good first issue | Label for small, well-described tasks that need no deep context; GitHub lists them for newcomers | D19 |
 | Head vs tail sampling | Per-span decision on arrival vs per-trace decision after buffering | D4 |
 | Health check (container) | Docker probe (`pg_isready`) gating `--wait` | D2 |
 | Held-out set | Test cases never used during tuning; S9–S12 | D0 |
@@ -63,7 +69,9 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | HMAC | Hash with a secret key; stored visitor ids cannot be reversed by hashing every IPv4 | D17 |
 | host.docker.internal | Hostname resolving to the host from inside a container | D4 |
 | IAM role / service account | Google permission bundles / non-human identities | D5 |
+| Inbound = outbound | Contributions come in under the same licence the project goes out under (Apache-2.0 §5) | D19 |
 | Integration test | Test against the real Postgres container | D2 |
+| Issue forms | YAML issue templates with required fields and dropdowns, so reports arrive complete | D19 |
 | JSONB | Postgres binary JSON column; `attrs` | D2 |
 | LangGraph | Agent framework: graph of nodes, shared state, checkpoints, interrupts | D0 |
 | Layer caching (Docker) | Unchanged Dockerfile layers are reused; deps before source | D5 |
@@ -87,15 +95,18 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Observability | Understanding a system from its logs, metrics and traces | D0 |
 | Observation (Langfuse) | Langfuse's span, typed: agent, chain, generation, tool | D18 |
 | OIDC token | Short-lived signed identity token GitHub mints per workflow run | D5 |
+| Open core | Business model: the core stays open source; a paid edition adds hosting or enterprise features | D19 |
 | ORM | Python classes mapped to tables (SQLAlchemy declarative) | D2 |
 | OTel Collector | Receives, processes, exports telemetry via YAML pipelines; arrays replace | D4 |
 | OTLP | OpenTelemetry Protocol; protobuf over gRPC/HTTP; JSON variant with hex ids | D3 |
 | OTTL | Collector transformation language for filter/transform processors | D4 |
 | Partial success | OTLP response reporting dropped items without failing the batch | D3 |
+| Permissive licence | Licence allowing any use, including closed and commercial (Apache-2.0, MIT), vs copyleft | D19 |
 | pgvector | Postgres extension for vector similarity search | D2 |
 | Pinning by SHA | `uses: action@<commit>`; immutable, unlike tags | D5 |
 | Pipeline (collector) | receivers → processors → exporters for one signal | D4 |
 | pre-commit / detect-secrets | Commit-time checks incl. secret detection with a baseline | D1 |
+| Private vulnerability reporting | GitHub feature: a private form on the Security tab that opens a draft advisory only maintainers see | D19 |
 | Probe-before-traffic | Deploy no-traffic revision, probe tagged URL, then shift traffic | D5 |
 | Processor (collector) | Transform step (batch, filter, tail_sampling, memory_limiter) | D4 |
 | Prompt injection | Data that tries to instruct the model; defended by wrapping + topology | D0 |
@@ -107,6 +118,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Rebase / force-with-lease | Replay commits on a new base; safe force push | D3 |
 | Receiver (collector) | Input of a pipeline (otlp, docker_stats) | D4 |
 | Replay mode | Serve captured telemetry by `scenario_id`; same code path as live | D0 |
+| Repository topics | Tags on a GitHub repo that put it on topic pages and in search filters | D19 |
 | Resource / scope (OTel) | Producer identity / instrumentation library | D3 |
 | Retention | Delete untagged rows after 24 h | D2 |
 | Revision (Cloud Run) | Immutable deployment; traffic split and tags per revision | D5 |
