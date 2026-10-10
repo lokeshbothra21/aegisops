@@ -35,6 +35,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Context propagation | OTel keeps the current span in a contextvar that follows `await`; children nest automatically | D18 |
 | Conventional Commits | `type(scope): message` commit format | D1 |
 | Coordinated disclosure | Reporter tells the maintainer privately, the fix ships, then the issue is published | D19 |
+| CORS | Response headers by which an API lets other origins read it; enforced by browsers, not auth | D20 |
 | Coverage | Share of code lines executed by tests | D3 |
 | DCO (Developer Certificate of Origin) | A `Signed-off-by:` line per commit certifying you may submit the code under the project licence | D19 |
 | Decorator pattern | Wrap an object in one with the same interface that adds behaviour (`TracedLLM` records, delegates) | D18 |
@@ -46,6 +47,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Docker Compose / override | Multi-container config; later `-f` files merge over earlier ones | D2, D4 |
 | docker_stats receiver | Collector receiver scraping container CPU/memory from the Docker socket | D4 |
 | Entrypoint script | Container start script: migrate if DB configured, then `exec uvicorn` | D5 |
+| EventSource | Browser's built-in SSE client; parses event/data/id lines, reconnects by itself | D20 |
 | Evidence verification | Code checks every LLM-cited reference exists and numbers are within ±20 % | D0 |
 | executemany | One INSERT with many rows; basis of 20k spans/s ingest | D3 |
 | Exporter (collector) | Output of a pipeline (otlphttp/aegisops, otlp_grpc/jaeger) | D4 |
@@ -56,6 +58,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Feature flag / flagd | Runtime switch; flagd serves flags from a JSON file it hot-reloads | D0 |
 | Fixture (test) | Reusable test data/setup | D3 |
 | Flush vs commit | Flush sends SQL inside the open transaction; only commit makes it visible to others | D17 |
+| Full match vs prefix match | Origin regex must match the whole string, or `…vercel.app.evil.example` passes | D20 |
 | Gauge / Sum / Histogram | OTel metric types: value now / counter / bucketed distribution | D3 |
 | Generation (Langfuse) | Observation for one model call: prompt, answer, model, tokens, cost | D18 |
 | GFE (Google Frontend) | Google's edge proxy for run.app; reserves `/healthz` | D5 |
@@ -74,6 +77,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Issue forms | YAML issue templates with required fields and dropdowns, so reports arrive complete | D19 |
 | JSONB | Postgres binary JSON column; `attrs` | D2 |
 | LangGraph | Agent framework: graph of nodes, shared state, checkpoints, interrupts | D0 |
+| Last-Event-ID | Header EventSource sends on reconnect so the server resumes after that event | D20 |
 | Layer caching (Docker) | Unchanged Dockerfile layers are reused; deps before source | D5 |
 | Least privilege | Each identity/workflow gets only the permissions it needs | D5 |
 | Lifespan | FastAPI startup/shutdown hook (engine create/dispose) | D1 |
@@ -96,6 +100,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Observation (Langfuse) | Langfuse's span, typed: agent, chain, generation, tool | D18 |
 | OIDC token | Short-lived signed identity token GitHub mints per workflow run | D5 |
 | Open core | Business model: the core stays open source; a paid edition adds hosting or enterprise features | D19 |
+| Origin | Scheme + host + port; two URLs share an origin only if all three match | D20 |
 | ORM | Python classes mapped to tables (SQLAlchemy declarative) | D2 |
 | OTel Collector | Receives, processes, exports telemetry via YAML pipelines; arrays replace | D4 |
 | OTLP | OpenTelemetry Protocol; protobuf over gRPC/HTTP; JSON variant with hex ids | D3 |
@@ -106,6 +111,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Pinning by SHA | `uses: action@<commit>`; immutable, unlike tags | D5 |
 | Pipeline (collector) | receivers → processors → exporters for one signal | D4 |
 | pre-commit / detect-secrets | Commit-time checks incl. secret detection with a baseline | D1 |
+| Preflight request | Automatic OPTIONS before a non-simple cross-origin request (custom headers, JSON) | D20 |
 | Private vulnerability reporting | GitHub feature: a private form on the Security tab that opens a draft advisory only maintainers see | D19 |
 | Probe-before-traffic | Deploy no-traffic revision, probe tagged URL, then shift traffic | D5 |
 | Processor (collector) | Transform step (batch, filter, tail_sampling, memory_limiter) | D4 |
@@ -121,11 +127,13 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Repository topics | Tags on a GitHub repo that put it on topic pages and in search filters | D19 |
 | Resource / scope (OTel) | Producer identity / instrumentation library | D3 |
 | Retention | Delete untagged rows after 24 h | D2 |
+| Reverse proxy | Server forwarding requests to another; hides the backend and the client's address | D20 |
 | Revision (Cloud Run) | Immutable deployment; traffic split and tags per revision | D5 |
 | RFC 7807 | `application/problem+json` error format | D3 |
 | Root cause vs symptom | The failing thing vs the visible effect | D0 |
 | Ruff | Linter + formatter | D1 |
 | Runner | Ephemeral VM a CI job runs on | D5 |
+| Same-origin policy | Browser rule: a page may not read another origin's responses unless it agrees | D20 |
 | Sampling policy | Rule in tail_sampling (status_code, probabilistic) | D4 |
 | Schema drift test | Asserts live DB equals ORM models | D2 |
 | Score (Langfuse) | A number attached to a trace, chartable across runs (claimed vs verified confidence) | D18 |

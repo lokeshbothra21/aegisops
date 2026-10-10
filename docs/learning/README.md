@@ -31,3 +31,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [17](day-17-2026-09-27-public-run-limits.md) | 27 Sep | Public run admission: per-visitor limit, daily cap, cached fallback, scenario replay; two races the deploy caught | #32–#34 |
 | [18](day-18-2026-10-10-langfuse-tracing.md) | 10 Oct | Langfuse tracing: one trace per run, node spans, generations, tools, scores | #39 |
 | [19](day-19-2026-10-10-open-to-contributors.md) | 10 Oct | Opening the repo: CONTRIBUTING, SECURITY, code of conduct, issue forms, DCO check, topics, starter issues | #43 |
+| [20](day-20-2026-10-10-web-ui.md) | 10 Oct | Web UI: CORS and direct browser calls (ADR-021), incident runs, SSE resume | #51 |

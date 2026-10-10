@@ -1,4 +1,5 @@
-"""Runs (§7): start, public scenario replay, summary, SSE event stream, approve / reject (🔒).
+"""Runs (§7): start, list per incident, public scenario replay, summary, SSE event stream,
+approve / reject (🔒).
 
 Starting a run goes through admission (E9.4, `runs/limits.py`): visitors on the public
 deployment are limited, and past the daily cap they are served the last finished run.
@@ -12,7 +13,7 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response, status
+from fastapi import APIRouter, Depends, Header, Query, Request, Response, status
 from pydantic import BaseModel, Field
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -167,6 +168,21 @@ async def start_run(
     return await _admitted_run(session, request, response, incident, body)
 
 
+@router.get("/incidents/{incident_id}/runs", response_model=list[RunOut])
+async def list_incident_runs(
+    incident_id: int, session: Session, limit: Annotated[int, Query(ge=1, le=50)] = 20
+) -> list[RunOut]:
+    """An incident's runs, newest first: the UI opens the latest and lists the rest."""
+    if await session.get(Incident, incident_id) is None:
+        raise ProblemError(status.HTTP_404_NOT_FOUND, "Incident not found", str(incident_id))
+    runs = (
+        await session.scalars(
+            select(Run).where(Run.incident_id == incident_id).order_by(Run.id.desc()).limit(limit)
+        )
+    ).all()
+    return [await _run_out(session, r) for r in runs]
+
+
 @router.post("/scenarios/{key}/replay", response_model=RunOut, status_code=status.HTTP_202_ACCEPTED)
 async def replay_scenario(
     key: str, request: Request, response: Response, session: Session
@@ -209,10 +225,19 @@ async def get_run(run_id: int, session: Session) -> RunOut:
 
 @router.get("/runs/{run_id}/events")
 async def run_events(
-    run_id: int, request: Request, session: Session, after: Annotated[int, Query(ge=0)] = 0
+    run_id: int,
+    request: Request,
+    session: Session,
+    after: Annotated[int, Query(ge=0)] = 0,
+    last_event_id: Annotated[str | None, Header()] = None,
 ) -> EventSourceResponse:
     """SSE: replay stored events with seq > `after`, then live ones until the run ends.
-    Event names are the node names; `run`/`end` closes the stream."""
+    Event names are the node names; `run`/`end` closes the stream.
+
+    A browser's EventSource reconnects by itself and sends the last id it saw as
+    `Last-Event-ID`; honouring it means a reconnect resumes instead of replaying everything."""
+    if last_event_id and last_event_id.isdigit():
+        after = max(after, int(last_event_id))
     run = await session.get(Run, run_id)
     if run is None:
         raise ProblemError(status.HTTP_404_NOT_FOUND, "Run not found", str(run_id))

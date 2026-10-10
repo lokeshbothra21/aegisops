@@ -81,6 +81,11 @@ class Settings(BaseSettings):
         default=False,
         description="Take the client IP from the right-most X-Forwarded-For entry (Cloud Run).",
     )
+    cors_origin_regex: str = Field(
+        default=r"http://(localhost|127\.0\.0\.1)(:\d+)?",
+        description="Browser origins allowed to call the API (full match), e.g. the web UI's "
+        "Vercel domains. The UI calls the API directly, never through a proxy (ADR-021).",
+    )
     recorded_llm_path: str | None = Field(
         default=None,
         description="Cassette file: replay model outputs instead of calling providers (tests/CI).",

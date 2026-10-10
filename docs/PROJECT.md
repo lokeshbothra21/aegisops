@@ -219,7 +219,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 ### E10 — UI
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
-| E10.1 | Incidents list | M | W5 | todo |
+| E10.1 | Incidents list | M | W5 | API support done (PR #51: CORS, incident runs, SSE resume); UI in progress |
 | E10.2 | Incident detail: SSE timeline, hypotheses, evidence panel, remediation card, outcome | M | W5 | todo |
 | E10.3 | Benchmark page | M | W11 | todo |
 | E10.4 | Where-it-fails page | M | W11 | todo |
@@ -385,8 +385,9 @@ Base: `/api/v1`. Auth: none for GET; `X-Admin-Token` for mutating routes marked 
 | GET | `/incidents?status=&limit=&cursor=` | List |
 | GET | `/incidents/{id}` | Detail incl. latest run, remediation, postmortem |
 | POST | `/incidents/{id}/runs` | Start (or restart) an investigation; body `{model?, variant?}` |
+| GET | `/incidents/{id}/runs` | An incident's runs, newest first (UI) |
 | GET | `/runs/{id}` | Run summary |
-| GET | `/runs/{id}/events` | **SSE** stream; replays `run_events` from seq then live |
+| GET | `/runs/{id}/events` | **SSE** stream; replays `run_events` after `?after=` or `Last-Event-ID`, then live |
 | POST 🔒 | `/runs/{id}/approve` · `/reject` | Resume interrupted graph |
 | GET | `/scenarios` | Catalogue (for public "start a replay") |
 | POST | `/scenarios/{key}/replay` | Starts a run on the scenario's captured incident, or joins its live run (rate-limited; `served: new\|joined\|cached`) |
@@ -863,6 +864,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.20 | 27 Sep 2026 | W3 D6: **E9.4 public run admission** (`runs/limits.py`, ADR-018): admin token bypasses; public mode limits visitors (`public:<HMAC of IP>`, right-most XFF behind Cloud Run) to one running run and a daily cap (`AEGIS_PUBLIC_DAILY_RUN_CAP`=30, UTC day), counted on `runs` rows under `pg_advisory_xact_lock`; past the cap the incident's last finished run is served (`served: cached`), else 429 + Retry-After. Visitor runs end at the proposal (`decision: not_offered`) since nobody can approve in public. `POST /scenarios/{key}/replay` joins a live run or starts one. Stalled runs (> 10 min `running`) stop blocking. Migration `0007` `runs.requested_by`. Stale statuses fixed (E2.2, E5.4, E5.6, E8.4). **Deploy of #32 failed in the workflow's test step:** a race since PR #28, the agent task wrote `audit_log` rows before the request committed the run (FK violation under read committed); PR #33 commits in `start()`/`decide()` before launching the task, with a second-connection regression test. **Next deploy failed on a second race:** incident resolved before its `verification` event was written (two transactions); PR #34 writes every state change and its event in one transaction (`_stage` + publish after commit). 174 tests. |
 | 1.0.21 | 10 Oct 2026 | W4 D1: **E8.1 Langfuse tracing** (`aegisops_agent/tracing.py`, ADR-019): official SDK v4 on a dedicated TracerProvider; three seams: `TracedLLM` (generation: prompt, structured output, model, usage, cost from `models.yaml`), `ToolRunner.call` (tool observation), `traced_node` (chain span; `interrupt()` = paused, not error). Trace id = `create_trace_id(seed=thread_id)` so the resume leg joins the same trace; stored on `runs.langfuse_trace_id`, returned by `GET /runs/{id}`. Scores `claimed_confidence`/`verified_confidence`. Off without keys; API tests force it off (`.env` may hold real keys). Secrets `aegis-langfuse-public-key`/`-secret-key` in Secret Manager, mounted by the deploy. **Live (CLI on captured S1):** one trace, 27 observations (1 agent, 8 chain, 5 generations, 13 tools), $0.0051, 112 s; both `investigate` generations on gpt-oss-120b = Gemini fallbacks. |
 | 1.0.22 | 10 Oct 2026 | W4 D1: **E12.8 open to contributors** (§14.1 items that were missing): `CONTRIBUTING.md` (safety model as four non-negotiable rules; setup needs only Postgres because tests replay cassettes; Conventional Commits; sign-off), `SECURITY.md` (private vulnerability reporting, 7-day acknowledgement, scope from §11: approval bypass, working prompt injection, parameter injection, admission bypass, secrets), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue forms (bug, feature with safety checkbox, contact links), PR template sign-off box. **ADR-020: DCO, not a CLA**; `dco.yml` checks every PR commit for `Signed-off-by` via the API (read-only token, no third-party action; Dependabot signs off itself). Repo topics set, private vulnerability reporting enabled, starter issues opened. README: Contributing section, test count 181. Biggest remaining barrier to trying it: no one-command replay until fixtures ship with the first release (E11.7). |
+| 1.0.23 | 10 Oct 2026 | W4 D1: API support for the web UI (**ADR-021**: the browser calls the API directly, not through a Vercel proxy, so `X-Forwarded-For` still identifies each visitor and SSE streams are not cut by function limits). `CORSMiddleware` with one full-match origin regex `AEGIS_CORS_ORIGIN_REGEX` (default localhost/127.0.0.1 any port), GET/POST, headers `Content-Type`, `X-Admin-Token`, `Last-Event-ID`, exposes `Retry-After`, no credentials. `GET /incidents/{id}/runs` (newest first). SSE honours `Last-Event-ID` (EventSource reconnects resume). Also: Dependabot round (#36, #48, #50; #35 closed, Python 3.14 ignored) and the **first outside contribution**, #49 `aegis-scenario show` by @AnushreeKasturi (closes #45). 188 tests. |
 
 ---
 

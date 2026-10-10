@@ -91,6 +91,7 @@ Local gcloud: `export CLOUDSDK_ACTIVE_CONFIG_NAME=aegisops` (account lokesh89468
 | Rotate a production secret | `printf '%s' "$NEW" \| gcloud secrets versions add <name> --data-file=-`, then Actions → deploy-api → Run workflow. Secrets: `aegis-database-url`, `aegis-admin-token`, `aegis-gemini-api-key`, `aegis-groq-api-key`. | <!-- pragma: allowlist secret -->
 | Migrate Supabase by hand | `AEGIS_DATABASE_URL=<pooler URL with +asyncpg> uv run alembic upgrade head` in `apps/api` (the container also runs it at start). Use the **Session pooler** URL, never the IPv6-only direct host. |
 | Schema change needed | New Alembic migration; CI runs it against a fresh DB; deploy runs `alembic upgrade head` as a pre-start step. |
+| Web UI shows "cannot reach the API" / browser console says CORS | The UI's origin does not fully match `AEGIS_CORS_ORIGIN_REGEX`. Check the exact origin (scheme, host, no trailing slash) against the regex; a new Vercel project name or custom domain needs the regex updated in `deploy-api.yml`. Test: `curl -sI -H 'Origin: https://<ui-host>' $API/livez \| grep -i access-control-allow-origin`. |
 | Key leaked | Rotate in the provider, update Secret Manager, redeploy, add a note to `SECURITY.md`. |
 
 ## Agent

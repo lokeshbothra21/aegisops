@@ -93,6 +93,8 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **How do you get the client IP behind Cloud Run?** Right-most `X-Forwarded-For` entry (appended by Google); left entries are client-supplied and forgeable. Stored only as an HMAC. (Day 17)
 - **Why does Langfuse get its own TracerProvider?** Isolation: only agent spans go to Langfuse; the API's HTTP/SQL spans (E8.2) go to our collector; neither library sets the other's sampling. (Day 18)
 - **How do you take security reports on a public project?** Private vulnerability reporting, response times you can keep, and a scope written from your own threat model (approval bypass, working prompt injection, admission bypass). (Day 19)
+- ★ **Why not proxy the API through Vercel to avoid CORS?** Per-visitor limits key on the client address Google's front end records; behind a proxy every visitor is Vercel's IP. Plus streaming limits, and no secret to hide. (Day 20, ADR-021)
+- **Is CORS a security control?** It protects browser users from other sites reading responses with their credentials; it does not protect the API from scripts. Auth does. (Day 20)
 - **Where do secrets live?** Never in the repo; env/Secret Manager in prod; GitHub variables only for non-secret ids.
 
 ## Evaluation (planned, Weeks 4–11)

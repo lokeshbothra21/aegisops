@@ -12,6 +12,7 @@ from typing import Any
 
 import structlog
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
 
 from aegisops_agent.actions import ActionExecutor, AuditWriter, LiveBackend, ReplayBackend
@@ -192,6 +193,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     install_error_handlers(app)
+    # the web UI (another origin) calls the API from the browser: reads, run starts, the SSE
+    # stream and, with an operator token, approvals. No cookies, so no credentials.
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=settings.cors_origin_regex,
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "X-Admin-Token", "Last-Event-ID"],
+        expose_headers=["Retry-After"],
+        max_age=600,
+    )
     app.include_router(health.router)
     app.include_router(ingest.router)
     app.include_router(admin.router)
