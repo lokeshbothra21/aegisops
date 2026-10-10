@@ -29,3 +29,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [15](day-15-2026-09-25-execute-actions-safety.md) | 25 Sep | Execute node, actions, validation, audit log, post-action verification, structure test | #28 |
 | [16](day-16-2026-09-26-production-database.md) | 26 Sep | Supabase via the pooler, Secret Manager, readiness gate, keep-alive, public mode | #29–#31 |
 | [17](day-17-2026-09-27-public-run-limits.md) | 27 Sep | Public run admission: per-visitor limit, daily cap, cached fallback, scenario replay; two races the deploy caught | #32–#34 |
+| [18](day-18-2026-10-10-langfuse-tracing.md) | 10 Oct | Langfuse tracing: one trace per run, node spans, generations, tools, scores | #39 |

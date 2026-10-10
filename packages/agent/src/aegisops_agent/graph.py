@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import time
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, TypedDict, cast
 
@@ -39,6 +39,7 @@ from aegisops_agent.schemas import (
     VerifiedRootCause,
 )
 from aegisops_agent.tools import BudgetExceededError, ToolRunner, tool_catalogue
+from aegisops_agent.tracing import Tracing, traced_node
 from aegisops_agent.verifier import Verifier
 
 log = structlog.get_logger()
@@ -90,6 +91,7 @@ class Deps:
     policy: Policy | None = None
     executor: ActionExecutor | None = None
     clock: Callable[[], float] = time.monotonic
+    tracing: Tracing = field(default_factory=Tracing)
 
     def policy_allows_execute(self) -> bool:
         return (
@@ -564,7 +566,8 @@ def build_graph(deps: Deps, checkpointer: Checkpointer | None = None) -> Any:
     nodes = build_nodes(deps)
     g: StateGraph[AgentState] = StateGraph(AgentState)
     for name, fn in nodes.items():
-        g.add_node(name, cast(Any, fn))  # LangGraph's node protocol is not expressible for mypy
+        node = traced_node(name, fn, deps.tracing) if deps.tracing.enabled else fn
+        g.add_node(name, cast(Any, node))  # LangGraph's node protocol is not expressible for mypy
     g.add_edge(START, "triage")
     g.add_conditional_edges(
         "triage", _after("plan"), {"plan": "plan", "correlate_changes": "correlate_changes"}

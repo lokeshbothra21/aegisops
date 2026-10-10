@@ -18,6 +18,7 @@ from aegisops_agent.actions import ActionExecutor, AuditWriter, LiveBackend, Rep
 from aegisops_agent.llm import LLMClient, RecordedLLM, Router, load_models_config
 from aegisops_agent.remediation import load_policy
 from aegisops_agent.run import psycopg_url
+from aegisops_agent.tracing import Tracing
 from aegisops_api import __version__
 from aegisops_api.alerts.evaluator import Evaluator, ensure_default_rules, load_rules_file
 from aegisops_api.db import create_engine, create_session_factory, session_scope
@@ -131,6 +132,17 @@ def build_run_manager(app: FastAPI, engine: Any, saver: AsyncPostgresSaver) -> R
         checkpointer=saver,
         prices=models.prices,
         public_mode=settings.public_mode,
+        tracing=Tracing.create(
+            public_key=settings.langfuse_public_key,
+            secret_key=(
+                settings.langfuse_secret_key.get_secret_value()
+                if settings.langfuse_secret_key
+                else None
+            ),
+            base_url=settings.langfuse_base_url,
+            environment=settings.env,
+            enabled=settings.tracing_enabled,
+        ),
     )
 
 

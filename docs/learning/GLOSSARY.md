@@ -29,18 +29,22 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Connection pool | Reused DB connections; `pool_pre_ping` detects dead ones | D2 |
 | Connector (collector) | Exporter of one pipeline that is the receiver of another (span_metrics) | D4 |
 | Content-Encoding gzip | Compressed request body; server must inflate; check size before and after | D3 |
+| Context propagation | OTel keeps the current span in a contextvar that follows `await`; children nest automatically | D18 |
 | Conventional Commits | `type(scope): message` commit format | D1 |
 | Coverage | Share of code lines executed by tests | D3 |
+| Decorator pattern | Wrap an object in one with the same interface that adds behaviour (`TracedLLM` records, delegates) | D18 |
 | Dependabot | GitHub bot for vulnerability alerts and scheduled dependency-update PRs | D5 |
 | Dependency review | PR check that blocks vulnerable or badly-licensed new dependencies | D5 |
 | Denormalisation | Copying `service` onto every row to avoid joins | D2 |
 | Deterministic | Same input → same output; used for detection and verification | D0 |
+| Deterministic trace id | `create_trace_id(seed=thread_id)`: same run, same trace, across legs and instances | D18 |
 | Docker Compose / override | Multi-container config; later `-f` files merge over earlier ones | D2, D4 |
 | docker_stats receiver | Collector receiver scraping container CPU/memory from the Docker socket | D4 |
 | Entrypoint script | Container start script: migrate if DB configured, then `exec uvicorn` | D5 |
 | Evidence verification | Code checks every LLM-cited reference exists and numbers are within ±20 % | D0 |
 | executemany | One INSERT with many rows; basis of 20k spans/s ingest | D3 |
 | Exporter (collector) | Output of a pipeline (otlphttp/aegisops, otlp_grpc/jaeger) | D4 |
+| Exporter / flush | Spans are batched and sent by a background exporter; flush forces the buffer out now | D18 |
 | Fan-out | One receiver feeding several pipelines | D4 |
 | FastAPI | Async Python web framework with Pydantic validation and OpenAPI | D1 |
 | Fault injection | Deliberately breaking a system (flag toggle) to test response | D4 |
@@ -48,6 +52,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Fixture (test) | Reusable test data/setup | D3 |
 | Flush vs commit | Flush sends SQL inside the open transaction; only commit makes it visible to others | D17 |
 | Gauge / Sum / Histogram | OTel metric types: value now / counter / bucketed distribution | D3 |
+| Generation (Langfuse) | Observation for one model call: prompt, answer, model, tokens, cost | D18 |
 | GFE (Google Frontend) | Google's edge proxy for run.app; reserves `/healthz` | D5 |
 | GitHub Actions | GitHub CI/CD: workflows → jobs → steps, triggered by events | D5 |
 | GitHub variables vs secrets | Non-secret config vs encrypted, masked values | D5 |
@@ -78,7 +83,9 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | mypy --strict | Static type checking, all strictness on | D1 |
 | NFR | Non-functional requirement (latency, cost, throughput, coverage) | D0 |
 | Non-root container | `USER aegis`; limits blast radius | D5 |
+| Null object pattern | A do-nothing stand-in (tracing off) so call sites need no `if enabled` branches | D18 |
 | Observability | Understanding a system from its logs, metrics and traces | D0 |
+| Observation (Langfuse) | Langfuse's span, typed: agent, chain, generation, tool | D18 |
 | OIDC token | Short-lived signed identity token GitHub mints per workflow run | D5 |
 | ORM | Python classes mapped to tables (SQLAlchemy declarative) | D2 |
 | OTel Collector | Receives, processes, exports telemetry via YAML pipelines; arrays replace | D4 |
@@ -109,6 +116,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Runner | Ephemeral VM a CI job runs on | D5 |
 | Sampling policy | Rule in tail_sampling (status_code, probabilistic) | D4 |
 | Schema drift test | Asserts live DB equals ORM models | D2 |
+| Score (Langfuse) | A number attached to a trace, chartable across runs (claimed vs verified confidence) | D18 |
 | Semantic conventions | Standard OTel attribute names | D3 |
 | Service container (CI) | Sidecar container (Postgres) for a job | D5 |
 | Squash merge | PR becomes one commit on main | D1 |
@@ -123,6 +131,8 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Temporality | CUMULATIVE vs DELTA for sums/histograms | D3 |
 | 12-factor config | Config from environment variables only | D1 |
 | 413 / 415 | Payload too large / unsupported media type | D3 |
+| Trace / span | Trace = one run's story; span = one timed step in it with a parent and attributes | D18 |
+| TracerProvider | OTel factory for spans; one global per process, or a dedicated one for isolation | D18 |
 | uv / workspace | Fast Python project manager; multi-package repo with one lockfile | D1 |
 | Version pinning | Fixed demo tag 3.0.0 checked by `make demo-check` | D4 |
 | WIF | Workload Identity Federation: swap GitHub's OIDC token for Google credentials, keyless | D5 |

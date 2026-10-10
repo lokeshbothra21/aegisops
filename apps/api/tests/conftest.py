@@ -14,6 +14,13 @@ from aegisops_api.settings import Settings
 ADMIN_TOKEN = "test-admin-token"  # pragma: allowlist secret
 
 
+@pytest.fixture(autouse=True)
+def _no_real_tracing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Settings also read `.env`, which may hold real Langfuse keys: tests never send
+    traces (environment variables beat the .env file). Tracing tests opt in explicitly."""
+    monkeypatch.setenv("AEGIS_TRACING_ENABLED", "false")
+
+
 @pytest.fixture
 def settings() -> Settings:
     # jobs_enabled=False: the periodic retention job would delete the fixture rows

@@ -16,7 +16,7 @@ import json
 import os
 import sys
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -33,6 +33,7 @@ from aegisops_agent.llm import LLMClient, RecordedLLM, Router, load_models_confi
 from aegisops_agent.remediation import Policy, load_policy
 from aegisops_agent.schemas import Budget, VerifiedRootCause
 from aegisops_agent.tools import ToolRunner
+from aegisops_agent.tracing import TracedLLM, Tracing
 from aegisops_tools.context import ToolContext
 from aegisops_tools.db import DEFAULT_URL, engine_from_env, session_factory
 
@@ -64,13 +65,25 @@ def make_graph(
     checkpointer: AsyncPostgresSaver | None = None,
     executor: ActionExecutor | None = None,
     run_id: int | None = None,
+    tracing: Tracing | None = None,
+    prices: Mapping[str, Mapping[str, float]] | None = None,
 ) -> tuple[Any, ToolRunner]:
     budget = budget or Budget()
+    tracing = tracing or Tracing()
     audit = executor.audit if executor is not None else None
     tools = ToolRunner(
-        factory=session_factory(engine), ctx=ctx, budget=budget, audit=audit, run_id=run_id
+        factory=session_factory(engine),
+        ctx=ctx,
+        budget=budget,
+        audit=audit,
+        run_id=run_id,
+        tracing=tracing,
     )
-    deps = Deps(llm=llm, tools=tools, budget=budget, policy=policy, executor=executor)
+    if tracing.enabled:
+        llm = TracedLLM(llm, tracing, prices or {})
+    deps = Deps(
+        llm=llm, tools=tools, budget=budget, policy=policy, executor=executor, tracing=tracing
+    )
     return build_graph(deps, checkpointer=checkpointer), tools
 
 
@@ -131,12 +144,22 @@ async def run_investigation(
     autonomy_level: int = 1,
     public_mode: bool = False,
     auto_decision: str = "rejected",
+    tracing: Tracing | None = None,
+    prices: Mapping[str, Mapping[str, float]] | None = None,
 ) -> tuple[VerifiedRootCause, AgentState]:
     """End to end in one process. Without a checkpointer the graph cannot pause, so the
     approval node is answered with `auto_decision` right away; with one, the interrupt is
     resumed the same way (no human here: CLI and tests)."""
+    tracing = tracing or Tracing()
     graph, tools = make_graph(
-        engine=engine, llm=llm, ctx=ctx, budget=budget, policy=policy, checkpointer=checkpointer
+        engine=engine,
+        llm=llm,
+        ctx=ctx,
+        budget=budget,
+        policy=policy,
+        checkpointer=checkpointer,
+        tracing=tracing,
+        prices=prices,
     )
     initial = initial_state(
         service=service,
@@ -147,9 +170,18 @@ async def run_investigation(
         auto_decision=None if checkpointer is not None else auto_decision,
     )
     config = {"configurable": {"thread_id": thread_id}}
-    final: AgentState = await graph.ainvoke(initial, config=config)
-    if "__interrupt__" in final and checkpointer is not None:
-        final = await graph.ainvoke(resume_command(auto_decision, "cli"), config=config)
+    with tracing.run(
+        trace_id=tracing.trace_id(thread_id),
+        name="investigation",
+        input={"service": service, "alert": alert_summary},
+        session_id=f"incident-{incident_id}" if incident_id is not None else None,
+        tags=["cli", "replay" if ctx.scenario_id else "live"],
+    ) as root:
+        final: AgentState = await graph.ainvoke(initial, config=config)
+        if "__interrupt__" in final and checkpointer is not None:
+            final = await graph.ainvoke(resume_command(auto_decision, "cli"), config=config)
+        root.update(output=final.get("verified_root_cause"))
+    await tracing.flush()
     final["tool_records"] = [r.model_dump() for r in tools.records]  # type: ignore[typeddict-unknown-key]
     return VerifiedRootCause.model_validate(final["verified_root_cause"]), final
 
@@ -181,11 +213,11 @@ async def _main(argv: list[str]) -> int:
         scenario_id=args.scenario,
         frozen_now=datetime.fromisoformat(args.frozen_now) if args.frozen_now else None,
     )
+    models = load_models_config(args.models)
     llm: LLMClient = (
-        RecordedLLM.from_file(args.recorded)
-        if args.recorded
-        else Router.from_env(load_models_config(args.models))
+        RecordedLLM.from_file(args.recorded) if args.recorded else Router.from_env(models)
     )
+    tracing = Tracing.from_env(environment="local")
     policy = load_policy(args.policy)
     thread_id = args.thread or f"cli-{int(time.time())}"
     common: dict[str, Any] = {
@@ -197,6 +229,8 @@ async def _main(argv: list[str]) -> int:
         "thread_id": thread_id,
         "policy": policy,
         "auto_decision": args.decision,
+        "tracing": tracing,
+        "prices": models.prices,
     }
     try:
         if args.no_checkpoint:
@@ -208,6 +242,7 @@ async def _main(argv: list[str]) -> int:
                 rc, final = await run_investigation(**common, checkpointer=saver)
     finally:
         await engine.dispose()
+        tracing.shutdown()
     out: dict[str, Any] = {
         "thread_id": thread_id,
         "root_cause": rc.model_dump(),

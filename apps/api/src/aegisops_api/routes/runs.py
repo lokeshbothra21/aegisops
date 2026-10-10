@@ -84,6 +84,7 @@ class RunOut(BaseModel):
     finished_at: datetime | None
     root_cause: dict[str, Any] | None
     error: str | None
+    langfuse_trace_id: str | None = None  # open in Langfuse: <project>/traces/<id> (E8.1)
     remediation: RemediationOut | None = None
     served: Literal["new", "joined", "cached"] = "new"
 

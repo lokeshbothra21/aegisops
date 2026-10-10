@@ -116,8 +116,8 @@ jobs:
             --platform managed --allow-unauthenticated --port 8080 \
             --cpu 1 --memory 1Gi --timeout 900 --concurrency 10 \
             --min-instances 0 --max-instances 3 --cpu-boost --session-affinity \
-            --set-env-vars "AEGIS_ENV=prod,AEGIS_LOG_JSON=true,AEGIS_LOG_LEVEL=INFO,AEGIS_PUBLIC_MODE=true,AEGIS_TRUST_FORWARDED_FOR=true" \
-            --set-secrets "AEGIS_DATABASE_URL=aegis-database-url:latest,AEGIS_ADMIN_TOKEN=aegis-admin-token:latest,AEGIS_GEMINI_API_KEY=aegis-gemini-api-key:latest,AEGIS_GROQ_API_KEY=aegis-groq-api-key:latest" \
+            --set-env-vars "AEGIS_ENV=prod,AEGIS_LOG_JSON=true,AEGIS_LOG_LEVEL=INFO,AEGIS_PUBLIC_MODE=true,AEGIS_TRUST_FORWARDED_FOR=true,LANGFUSE_BASE_URL=https://cloud.langfuse.com" \
+            --set-secrets "AEGIS_DATABASE_URL=aegis-database-url:latest,AEGIS_ADMIN_TOKEN=aegis-admin-token:latest,AEGIS_GEMINI_API_KEY=aegis-gemini-api-key:latest,AEGIS_GROQ_API_KEY=aegis-groq-api-key:latest,LANGFUSE_PUBLIC_KEY=aegis-langfuse-public-key:latest,LANGFUSE_SECRET_KEY=aegis-langfuse-secret-key:latest" \
             --labels "commit=${{ steps.meta.outputs.short }},managed-by=github-actions" \
             --tag "sha-${{ steps.meta.outputs.short }}" \
             $TRAFFIC_FLAG --quiet

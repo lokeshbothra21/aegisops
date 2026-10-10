@@ -7,7 +7,7 @@ Production values come from Cloud Run environment variables and Secret Manager.
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, SecretStr
+from pydantic import AliasChoices, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -84,6 +84,21 @@ class Settings(BaseSettings):
     recorded_llm_path: str | None = Field(
         default=None,
         description="Cassette file: replay model outputs instead of calling providers (tests/CI).",
+    )
+
+    tracing_enabled: bool = Field(
+        default=True, description="Send run traces to Langfuse when its keys are set (E8.1)."
+    )
+    # the Langfuse SDK's own variable names (no AEGIS_ prefix), so one .env serves both
+    langfuse_public_key: str | None = Field(
+        default=None, validation_alias=AliasChoices("LANGFUSE_PUBLIC_KEY", "langfuse_public_key")
+    )
+    langfuse_secret_key: SecretStr | None = Field(
+        default=None, validation_alias=AliasChoices("LANGFUSE_SECRET_KEY", "langfuse_secret_key")
+    )
+    langfuse_base_url: str = Field(
+        default="https://cloud.langfuse.com",
+        validation_alias=AliasChoices("LANGFUSE_BASE_URL", "langfuse_base_url"),
     )
 
     execute_enabled: bool = Field(

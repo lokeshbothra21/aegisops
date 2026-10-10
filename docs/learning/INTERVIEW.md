@@ -46,6 +46,9 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **How does model fallback work?** Router retries retryable errors once on the secondary; 4xx fail fast; `model_fallback` logged.
 - **Who owns the checkpoint tables?** LangGraph's saver; Alembic ignores `checkpoint*` via `include_object`.
 
+- ★ **How do you debug a wrong answer from the agent?** Open its Langfuse trace: every node's exact prompt, structured answer and answering model; the verifier's span shows what it dropped; scores show claimed vs verified. (Day 18)
+- **Why instrument at seams instead of decorating every node?** One wrapper each for the model client, tool runner and node keeps agent logic tracing-free; nesting comes from the OTel context. (ADR-019)
+
 ## Tools and MCP
 - **Why do tools return ≤ 4 KB?** Token budget and reasoning quality; aggregate in SQL. (Day 10)
 - **How do the same tools serve live and replay?** `scenario_id` filter + frozen `now` in the tool context; identical code.
@@ -88,6 +91,7 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Why non-root containers?** Limits blast radius of an app compromise.
 - ★ **How do you rate-limit a public AI demo across several instances?** Count in the shared database (the `runs` rows already hold requester, status, start time), make check-then-insert atomic with `pg_advisory_xact_lock`, one running run per visitor, a daily cap, then serve the last finished run. (Day 17, ADR-018)
 - **How do you get the client IP behind Cloud Run?** Right-most `X-Forwarded-For` entry (appended by Google); left entries are client-supplied and forgeable. Stored only as an HMAC. (Day 17)
+- **Why does Langfuse get its own TracerProvider?** Isolation: only agent spans go to Langfuse; the API's HTTP/SQL spans (E8.2) go to our collector; neither library sets the other's sampling. (Day 18)
 - **Where do secrets live?** Never in the repo; env/Secret Manager in prod; GitHub variables only for non-secret ids.
 
 ## Evaluation (planned, Weeks 4–11)

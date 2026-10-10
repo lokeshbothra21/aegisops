@@ -15,6 +15,7 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from aegisops_agent.schemas import Budget, ToolCallRecord, Usage
+from aegisops_agent.tracing import Tracing, clip
 
 if TYPE_CHECKING:
     from aegisops_agent.actions import AuditWriter
@@ -62,8 +63,26 @@ class ToolRunner:
     records: list[ToolCallRecord] = field(default_factory=list)
     audit: AuditWriter | None = None  # E9.6: every tool call, allowed or denied
     run_id: int | None = None
+    tracing: Tracing = field(default_factory=Tracing)  # E8.1: off unless keys are set
 
     async def call(self, node: str, hypothesis_id: str, tool: str, args: dict[str, Any]) -> str:
+        """`_call`, as a tool observation under the current node when tracing is on."""
+        if not self.tracing.enabled:
+            return await self._call(node, hypothesis_id, tool, args)
+        with self.tracing.observe(
+            tool, "tool", input={"args": args, "hypothesis": hypothesis_id}
+        ) as obs:
+            before = len(self.records)
+            out = await self._call(node, hypothesis_id, tool, args)
+            rec = self.records[-1] if len(self.records) > before else None
+            obs.update(
+                output=clip(out),
+                level="WARNING" if rec is not None and not rec.ok else None,
+                status_message=rec.error if rec is not None and not rec.ok else None,
+            )
+            return out
+
+    async def _call(self, node: str, hypothesis_id: str, tool: str, args: dict[str, Any]) -> str:
         """Run one tool for `node`; returns the untrusted envelope or an error envelope.
 
         Denied and failed calls still count against the budget: a model that keeps asking

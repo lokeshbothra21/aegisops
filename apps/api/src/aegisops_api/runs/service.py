@@ -22,6 +22,7 @@ from uuid import uuid4
 
 import structlog
 from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.types import Command
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
@@ -30,6 +31,7 @@ from aegisops_agent.llm import LLMClient
 from aegisops_agent.remediation import Policy
 from aegisops_agent.run import StepEvent, initial_state, make_graph, resume_command, stream_steps
 from aegisops_agent.schemas import Budget
+from aegisops_agent.tracing import Tracing
 from aegisops_api.alerts.evaluator import COMPARE
 from aegisops_api.alerts.readers import READERS
 from aegisops_api.incidents.lifecycle import transition
@@ -61,6 +63,7 @@ class RunHandle:
     seq: int = 0
     done: bool = False
     proposal_only: bool = False  # public visitor run: end at the proposal, never pause
+    trace: dict[str, Any] = field(default_factory=dict)  # Langfuse session/user/tags (E8.1)
 
 
 @dataclass
@@ -75,6 +78,7 @@ class RunManager:
     budget: Budget = field(default_factory=Budget)
     executor: ActionExecutor | None = None
     verify_delay_s: float = 90.0
+    tracing: Tracing = field(default_factory=Tracing)
     handles: dict[int, RunHandle] = field(default_factory=dict)
     verifications: set[asyncio.Task[None]] = field(default_factory=set)
 
@@ -99,6 +103,7 @@ class RunManager:
             status=RunStatus.running,
             started_at=datetime.now(UTC),
             requested_by=requested_by,
+            langfuse_trace_id=Tracing.trace_id(thread_id) if self.tracing.enabled else None,
         )
         session.add(run)
         if incident.status is IncidentStatus.open:
@@ -109,6 +114,16 @@ class RunManager:
         # farther the database is. Also releases the admission lock at the right moment.
         await session.commit()
         handle = RunHandle(run_id=run.id, thread_id=thread_id, proposal_only=proposal_only)
+        handle.trace = {
+            "session_id": f"incident-{incident.id}",
+            "user_id": requested_by,
+            "tags": [
+                "public" if proposal_only else (requested_by or "local"),
+                "replay" if incident.scenario_id else "live",
+                f"variant:{variant}",
+            ],
+            "input": {"service": incident.service, "alert": incident.summary or ""},
+        }
         self.handles[run.id] = handle
         ctx = ToolContext(
             scenario_id=incident.scenario_id,
@@ -201,6 +216,7 @@ class RunManager:
                 h.task.cancel()
         for t in self.verifications:
             t.cancel()
+        await asyncio.to_thread(self.tracing.shutdown)  # flushes what is buffered
 
     # --- internals ------------------------------------------------------------------
 
@@ -253,6 +269,38 @@ class RunManager:
         return round(tokens_in / 1e6 * p.get("in", 0.0) + tokens_out / 1e6 * p.get("out", 0.0), 6)
 
     async def _drive(self, handle: RunHandle, ctx: ToolContext, inp: Any) -> None:
+        """One leg of a run (the start, or the resume after a decision) as one root
+        observation in the run's Langfuse trace; both legs share the trace id."""
+        if not self.tracing.enabled:
+            await self._drive_steps(handle, ctx, inp)
+            return
+        trace_id = Tracing.trace_id(handle.thread_id)
+        resumed = isinstance(inp, Command)
+        with self.tracing.run(
+            trace_id=trace_id,
+            name="resume" if resumed else "investigation",
+            input={"decision": inp.resume} if resumed else handle.trace.get("input"),
+            session_id=handle.trace.get("session_id"),
+            user_id=handle.trace.get("user_id"),
+            tags=handle.trace.get("tags"),
+            metadata={"run_id": str(handle.run_id)},
+        ) as root:
+            await self._drive_steps(handle, ctx, inp)
+            async with self.factory() as s:
+                run = await s.get(Run, handle.run_id)
+            if run is not None:
+                root.update(output={"status": run.status.value, "root_cause": run.root_cause})
+                rc = run.root_cause or {}
+                if not resumed and "confidence" in rc:
+                    # claimed vs verified per run: the verifier's effect, chartable in Langfuse
+                    self.tracing.score(trace_id, "verified_confidence", float(rc["confidence"]))
+                    if "claimed_confidence" in rc:
+                        self.tracing.score(
+                            trace_id, "claimed_confidence", float(rc["claimed_confidence"])
+                        )
+        await self.tracing.flush()
+
+    async def _drive_steps(self, handle: RunHandle, ctx: ToolContext, inp: Any) -> None:
         t0 = time.monotonic()
         graph, tools = make_graph(
             run_id=handle.run_id,
@@ -263,6 +311,8 @@ class RunManager:
             budget=self.budget,
             policy=self.policy,
             checkpointer=self.checkpointer,
+            tracing=self.tracing,
+            prices=self.prices,
         )
         acc: dict[str, Any] = {}  # merged state across steps: the last step alone is not enough
         models_used: set[str] = set()
