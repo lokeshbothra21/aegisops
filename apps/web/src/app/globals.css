@@ -1,0 +1,86 @@
+@import "tailwindcss";
+
+/* Colour tokens. Components use the Tailwind names on the right (bg-surface, text-muted...). */
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --surface-2: #f0f2f5;
+  --border: #dde1e7;
+  --text: #14171c;
+  --muted: #5d6673;
+  --accent: #2f5bd3;
+  --accent-text: #ffffff;
+  --ok: #18794e;
+  --ok-bg: #e6f4ec;
+  --warn: #9a5b00;
+  --warn-bg: #fdf3e1;
+  --bad: #c0362c;
+  --bad-bg: #fdecea;
+  --info: #2f5bd3;
+  --info-bg: #e8eefc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1014;
+    --surface: #151a20;
+    --surface-2: #1c222a;
+    --border: #2a323c;
+    --text: #e6e9ee;
+    --muted: #96a0ad;
+    --accent: #6d8ff0;
+    --accent-text: #0d1014;
+    --ok: #4cc38a;
+    --ok-bg: #12291f;
+    --warn: #f0b04e;
+    --warn-bg: #2e2412;
+    --bad: #f2786d;
+    --bad-bg: #331a18;
+    --info: #8ea9f5;
+    --info-bg: #182340;
+  }
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-info: var(--info);
+  --color-info-bg: var(--info-bg);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+html {
+  color-scheme: light dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

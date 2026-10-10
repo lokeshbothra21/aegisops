@@ -24,6 +24,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Cache (CI) | Reused files across runs keyed on a hash (uv.lock, Docker layers) | D5 |
 | Cached-run fallback | Past the cap, serve the incident's last finished run instead of an error | D17 |
 | CLA (Contributor Licence Agreement) | A signed grant of rights from contributor to maintainer; allows relicensing, adds friction | D19 |
+| Client-side rendering (CSR) | Static shell from the server; the browser fetches data and fills it (vs SSR) | D20 |
 | Code of conduct | Published rules for behaviour in project spaces and how reports are handled; we adopt Contributor Covenant 2.1 | D19 |
 | CodeQL | GitHub semantic code analysis for security bugs; Python + workflow files | D5 |
 | Community health files | CONTRIBUTING, CODE_OF_CONDUCT, SECURITY, issue/PR templates: GitHub surfaces them and newcomers look for them | D19 |
@@ -42,8 +43,10 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Dependabot | GitHub bot for vulnerability alerts and scheduled dependency-update PRs | D5 |
 | Dependency review | PR check that blocks vulnerable or badly-licensed new dependencies | D5 |
 | Denormalisation | Copying `service` onto every row to avoid joins | D2 |
+| Design tokens | Named colours defined once for light and dark; components use names | D20 |
 | Deterministic | Same input → same output; used for detection and verification | D0 |
 | Deterministic trace id | `create_trace_id(seed=thread_id)`: same run, same trace, across legs and instances | D18 |
+| Device emulation | Browser with a phone's viewport and pixel ratio; honest mobile checks | D20 |
 | Docker Compose / override | Multi-container config; later `-f` files merge over earlier ones | D2, D4 |
 | docker_stats receiver | Collector receiver scraping container CPU/memory from the Docker socket | D4 |
 | Entrypoint script | Container start script: migrate if DB configured, then `exec uvicorn` | D5 |
@@ -93,6 +96,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | MoSCoW | Must/Should/Could/Won't prioritisation | D0 |
 | Multi-stage build | Builder stage installs; runtime stage copies only the result | D5 |
 | mypy --strict | Static type checking, all strictness on | D1 |
+| Network-level mocking | Answering the browser's HTTP requests in the test (`page.route`) | D20 |
 | NFR | Non-functional requirement (latency, cost, throughput, coverage) | D0 |
 | Non-root container | `USER aegis`; limits blast radius | D5 |
 | Null object pattern | A do-nothing stand-in (tracing off) so call sites need no `if enabled` branches | D18 |
@@ -118,8 +122,10 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Prompt injection | Data that tries to instruct the model; defended by wrapping + topology | D0 |
 | Protobuf | Binary schema-based serialisation; OTLP's native format | D3 |
 | Pure function | No I/O; output depends only on input (`convert.py`) | D3 |
+| Pure function / reducer | Same input, same output, no side effects; turns events into page state | D20 |
 | Pydantic | Validation from type hints; every boundary is a model | D1 |
 | Race condition | Result depends on timing, e.g. two instances both take the last slot | D17 |
+| React effect | Post-render code syncing with the outside; don't set state synchronously in it | D20 |
 | Read committed | Postgres default isolation: a session sees only rows other sessions have committed | D17 |
 | Rebase / force-with-lease | Replay commits on a new base; safe force push | D3 |
 | Receiver (collector) | Input of a pipeline (otlp, docker_stats) | D4 |
@@ -137,8 +143,11 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Sampling policy | Rule in tail_sampling (status_code, probabilistic) | D4 |
 | Schema drift test | Asserts live DB equals ORM models | D2 |
 | Score (Langfuse) | A number attached to a trace, chartable across runs (claimed vs verified confidence) | D18 |
+| Security release | Patch published to fix vulnerabilities; take it at once | D20 |
 | Semantic conventions | Standard OTel attribute names | D3 |
 | Service container (CI) | Sidecar container (Postgres) for a job | D5 |
+| sessionStorage | Per-tab browser storage, cleared on close; holds the operator token | D20 |
+| Smoke test | A few broad end-to-end checks that the main paths work at all | D20 |
 | Squash merge | PR becomes one commit on main | D1 |
 | span_metrics | Connector computing calls/duration metrics from traces | D4 |
 | Span / trace | One operation / the tree of spans for one request | D0 |
@@ -153,6 +162,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | 413 / 415 | Payload too large / unsupported media type | D3 |
 | Trace / span | Trace = one run's story; span = one timed step in it with a parent and attributes | D18 |
 | TracerProvider | OTel factory for spans; one global per process, or a dedicated one for isolation | D18 |
+| useSyncExternalStore | React hook for a value living outside React (the operator token) | D20 |
 | uv / workspace | Fast Python project manager; multi-package repo with one lockfile | D1 |
 | Version pinning | Fixed demo tag 3.0.0 checked by `make demo-check` | D4 |
 | WIF | Workload Identity Federation: swap GitHub's OIDC token for Google credentials, keyless | D5 |

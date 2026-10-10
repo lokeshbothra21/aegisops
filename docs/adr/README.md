@@ -25,3 +25,4 @@ One file per decision that shaped the system. Format: Context (the problem and f
 | [017](ADR-017-dependency-licence-policy.md) | Dependency licence policy: strong copyleft denied, weak copyleft (LGPL/MPL) allowed as unmodified libraries |
 | [020](ADR-020-dco-not-cla.md) | Outside contributions under the DCO (sign-off checked by a workflow), not a CLA |
 | [021](ADR-021-browser-calls-api-directly.md) | The web UI's browser calls the API directly (CORS, regex full match), not through a Vercel proxy |
+| [022](ADR-022-web-stack.md) | Web UI stack: Next.js 16 (security fixes), client-rendered pages, npm, Tailwind tokens without a component kit, Vitest + Playwright |

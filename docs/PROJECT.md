@@ -173,7 +173,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
 | E5.1 | Category → action mapping + risk tiers | M | W6 | done early (PR #27, + flag-revert override) |
-| E5.2 | `approval` interrupt node; Approve/Reject API + UI | M | W5 | API done (PR #27); UI with E10.2 |
+| E5.2 | `approval` interrupt node; Approve/Reject API + UI | M | W5 | done (API PR #27, UI PR #52) |
 | E5.3 | Actions module: toggle_flag, restart_service, scale_service, rollback_deployment (compose/flagd backends) | M | W6 | done (PR #28; live: flag + restart; scale/rollback unsupported by the demo) |
 | E5.4 | Policy YAML + evaluator (autonomy level × risk × confidence) | M | W6 | done (PR #27 evaluator; enforced at execute PR #28) |
 | E5.5 | Post-action verification (re-evaluate alert after 90 s) | M | W6 | done (PR #28; post-action window only) |
@@ -219,8 +219,8 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 ### E10 — UI
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
-| E10.1 | Incidents list | M | W5 | API support done (PR #51: CORS, incident runs, SSE resume); UI in progress |
-| E10.2 | Incident detail: SSE timeline, hypotheses, evidence panel, remediation card, outcome | M | W5 | todo |
+| E10.1 | Incidents list | M | W5 | done (PR #51 API support, PR #52 UI: status filters, cursor paging, scenario replay cards) |
+| E10.2 | Incident detail: SSE timeline, hypotheses, evidence panel, remediation card, outcome | M | W5 | done (PR #52; live SSE with resume, claimed vs verified evidence, operator approve/reject, post-fix check) |
 | E10.3 | Benchmark page | M | W11 | todo |
 | E10.4 | Where-it-fails page | M | W11 | todo |
 
@@ -284,7 +284,7 @@ flowchart LR
 | `agent` package | LangGraph, Pydantic v2, LiteLLM-style thin router (own code) | Graph, nodes, schemas, budgets, verifier |
 | `tools` package | MCP Python SDK | Read-only telemetry MCP server; actions module (not MCP) |
 | `alerts` package | Python, APScheduler | Rule evaluation, incident opening |
-| `web` | Next.js 15, TypeScript, Tailwind, shadcn/ui | 4 pages |
+| `web` | Next.js 16, TypeScript, Tailwind (own tokens), npm, Vitest + Playwright (ADR-022) | 4 pages (2 built) |
 | `infra/otel-demo` | YAML | Collector override, compose overrides, pinned demo version |
 | `infra/faults` | YAML/sh | Custom fault overlays S9–S12 |
 | `bench` | Python | Scenarios, runner, capture, metrics, report |
@@ -340,7 +340,7 @@ stateDiagram-v2
 | DB | Postgres 17 + pgvector (Supabase) | One store for telemetry, state, vectors; free | ClickHouse (not free), Jaeger+Prom APIs (two stores, no replay) |
 | LLM | Gemini Flash primary, Groq secondary | Free tiers; fast | Paid frontier models (small final run only) |
 | Tracing | Langfuse cloud + OpenTelemetry | Free; industry standard | LangSmith (limits) |
-| Frontend | Next.js + Tailwind + shadcn/ui | Vercel free; fast to build | Streamlit (looks like a demo) |
+| Frontend | Next.js 16 + Tailwind (ADR-022: 15 failed dependency review; shadcn deferred) | Vercel free; fast to build | Streamlit (looks like a demo) |
 | Compute | Cloud Run | Free tier; GCP on resume; 60-min request timeout for SSE | Fly.io, Render (sleep behaviour) |
 | CI/CD | GitHub Actions + WIF → Cloud Run; Vercel Git | Free for public repos; keyless auth | Cloud Build |
 | Target system | OpenTelemetry Demo v3.x (pinned) | Real polyglot services, real OTLP, 15 fault flags | Synthetic log generator (circular eval) |
@@ -865,6 +865,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.21 | 10 Oct 2026 | W4 D1: **E8.1 Langfuse tracing** (`aegisops_agent/tracing.py`, ADR-019): official SDK v4 on a dedicated TracerProvider; three seams: `TracedLLM` (generation: prompt, structured output, model, usage, cost from `models.yaml`), `ToolRunner.call` (tool observation), `traced_node` (chain span; `interrupt()` = paused, not error). Trace id = `create_trace_id(seed=thread_id)` so the resume leg joins the same trace; stored on `runs.langfuse_trace_id`, returned by `GET /runs/{id}`. Scores `claimed_confidence`/`verified_confidence`. Off without keys; API tests force it off (`.env` may hold real keys). Secrets `aegis-langfuse-public-key`/`-secret-key` in Secret Manager, mounted by the deploy. **Live (CLI on captured S1):** one trace, 27 observations (1 agent, 8 chain, 5 generations, 13 tools), $0.0051, 112 s; both `investigate` generations on gpt-oss-120b = Gemini fallbacks. |
 | 1.0.22 | 10 Oct 2026 | W4 D1: **E12.8 open to contributors** (§14.1 items that were missing): `CONTRIBUTING.md` (safety model as four non-negotiable rules; setup needs only Postgres because tests replay cassettes; Conventional Commits; sign-off), `SECURITY.md` (private vulnerability reporting, 7-day acknowledgement, scope from §11: approval bypass, working prompt injection, parameter injection, admission bypass, secrets), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue forms (bug, feature with safety checkbox, contact links), PR template sign-off box. **ADR-020: DCO, not a CLA**; `dco.yml` checks every PR commit for `Signed-off-by` via the API (read-only token, no third-party action; Dependabot signs off itself). Repo topics set, private vulnerability reporting enabled, starter issues opened. README: Contributing section, test count 181. Biggest remaining barrier to trying it: no one-command replay until fixtures ship with the first release (E11.7). |
 | 1.0.23 | 10 Oct 2026 | W4 D1: API support for the web UI (**ADR-021**: the browser calls the API directly, not through a Vercel proxy, so `X-Forwarded-For` still identifies each visitor and SSE streams are not cut by function limits). `CORSMiddleware` with one full-match origin regex `AEGIS_CORS_ORIGIN_REGEX` (default localhost/127.0.0.1 any port), GET/POST, headers `Content-Type`, `X-Admin-Token`, `Last-Event-ID`, exposes `Retry-After`, no credentials. `GET /incidents/{id}/runs` (newest first). SSE honours `Last-Event-ID` (EventSource reconnects resume). Also: Dependabot round (#36, #48, #50; #35 closed, Python 3.14 ignored) and the **first outside contribution**, #49 `aegis-scenario show` by @AnushreeKasturi (closes #45). 188 tests. |
+| 1.0.24 | 10 Oct 2026 | W4 D1 (a week early: W5 items): **E10.1 + E10.2 web UI** (`apps/web`, ADR-022). Next.js **16.3.8** not 15 (15.5 bundles PostCSS with high advisories that fail our dependency review; 16.3.0–16.3.7 had critical ones fixed in 16.3.8), React 19.2, npm (Node 25 dropped corepack), Tailwind v4 tokens (light/dark), own small components (no shadcn yet). Client-rendered: the browser calls the API directly (ADR-021). Pages: incidents (status filters, cursor paging, scenario replay cards); incident detail (run selector, start/again, live SSE timeline of all nodes with pending/active/done/waiting states, hypotheses with supported marks, evidence panel claimed vs verified with kept and dropped refs and reasons, proposed fix with policy reason, operator approve/reject signed by name with the token in sessionStorage only, `not_offered` notice for public runs, outcome with the ~90 s post-fix check polled, run stats). Stream logic: never close on `run:end` (the post-fix check is stored after it); close on server end and reconnect only if still running, resuming after the last seq. Tests: 24 Vitest (reducer, stream hook with fake EventSource, API client, evidence panel, remediation card) + 6 Playwright (desktop + Pixel 7, API mocked, no sideways scroll). CI job `web`; CodeQL adds javascript-typescript; Dependabot npm; `make web`, `make web-check`. Checked live against the local API: run #73 renders 75% → 38% with the dropped metric and reason; a new recorded run on another incident showed 0 of 2 citations verified → confidence 0 → no action. |
 
 ---
 

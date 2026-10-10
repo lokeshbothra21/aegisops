@@ -16,6 +16,7 @@
 - **Acts only after approval, and checks its work**: the approved fix runs through allowlisted, shell-free actions (flag revert, container restart); 90 s later the triggering rule is re-checked over post-fix data and the incident is resolved or marked failed. Every tool call, decision and action is audited.
 - **Shows its working**: every run is one Langfuse trace: each graph node a span, each model call a generation with prompt, answer, model, tokens and cost, each tool call recorded; claimed vs verified confidence scored per run. Measured live on S1: 27 observations, $0.005, and the trace showed where the 112 s went (two Gemini → Groq fallbacks in `investigate`).
 - **Stays inside budgets**: 15 tool calls, 60k tokens, 180 s per run; a breach still produces a partial report.
+- **Watch it work in a browser**: an incidents page with one-click scenario replays, and an incident page that streams the investigation live: every step, the hypotheses, what the model claimed vs what survived the evidence check (and why each dropped citation was dropped), the proposed fix, and approve/reject for the operator. Works on a phone. The browser talks to the API directly, so per-visitor limits still see each visitor.
 - **Safe to leave public**: visitors can replay a scenario and watch the agent live, but only one run at a time each and a daily cap overall (counted in Postgres across instances); past the cap they get the last finished run instead of an error. Visitor runs stop at the proposal: nothing executes.
 - **Runs the same code live and in replay**: `aegis-scenario run S1` injects a fault, measures time-to-detect, reverts and captures the window; `aegis-scenario investigate S1` replays the agent on it with the clock frozen.
 
@@ -34,7 +35,7 @@ flowchart LR
     API["aegisops-api · FastAPI · Cloud Run"]
     DB[("Postgres 17 + pgvector")]
     JOBS["alert evaluator · flag & container watchers · retention · service edges"]
-    AGENT["LangGraph agent · 6 nodes · Postgres checkpoints"]
+    AGENT["LangGraph agent · Postgres checkpoints"]
     TOOLS["9 read tools · MCP server · untrusted envelope"]
     VER["evidence verifier (code, not LLM)"]
     API <--> DB
@@ -43,6 +44,7 @@ flowchart LR
     AGENT --> VER --> DB
   end
   LLM["Gemini 3.5 Flash → Groq fallback"] <--> AGENT
+  WEB["Web UI · Next.js"] -- "REST + SSE, direct (CORS)" --> API
 ```
 
 Full picture, built vs planned: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md). Every design decision with alternatives: [`docs/adr/`](docs/adr/README.md).
@@ -83,6 +85,7 @@ More in [`docs/learning/`](docs/learning/README.md), a day-by-day teaching log o
 make install                                   # uv sync + git hooks
 make db-up && make db-migrate                  # Postgres 17 + pgvector on :5433
 make api                                       # http://localhost:8000/docs
+make web-install && make web                   # UI on http://localhost:3000 (Operator → admin token to approve)
 make demo-up                                   # pinned OTel Demo + our collector layer (~2.5 GB RAM)
 make flag name=paymentFailure variant=100%     # inject a fault; an incident opens within ~60 s
 ```
@@ -95,7 +98,8 @@ uv run aegis-investigate ... --recorded packages/agent/tests/cassettes/s1_paymen
 uv run aegis-telemetry                         # the read tools as an MCP server (stdio)
 curl -X POST localhost:8000/api/v1/incidents/<id>/runs -d '{}' -H 'content-type: application/json'   # start a run
 curl -N localhost:8000/api/v1/runs/<run>/events   # live SSE stream; approve with POST /runs/<run>/approve
-make check                                     # lint, types, 181 tests against Postgres (same as CI)
+make check                                     # lint, types, 188 tests against Postgres (same as CI)
+make web-check                                 # web lint, types, 24 unit + 6 Playwright tests
 ```
 
 Run a scenario end to end and replay it:
@@ -116,12 +120,13 @@ Shard ingest by service and sample harder at the collector; keep the span-metric
 
 ## Tech stack
 
-Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (181 tests) · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
+Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (188 tests) · Next.js 16 · React 19 · Tailwind v4 · Vitest · Playwright · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
 
 ## Repository map
 
 | Path | What |
 |---|---|
+| `apps/web/` | Next.js UI: incidents, live investigation over SSE, evidence panel, approvals |
 | `apps/api/` | FastAPI service: ingest, health, incidents API, jobs (retention, service edges, flag & container watchers), alert evaluator |
 | `packages/tools/` | Nine read tools, untrusted envelope, `aegis-telemetry` MCP server |
 | `packages/agent/` | LangGraph graph, schemas, verifier, change correlation, model router, cassettes, `aegis-investigate` CLI |

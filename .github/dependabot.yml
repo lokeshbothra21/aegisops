@@ -43,3 +43,20 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     labels: [dependencies]
+
+  - package-ecosystem: npm
+    directory: /apps/web
+    schedule:
+      interval: weekly
+      day: tuesday
+      time: "06:00"
+      timezone: Asia/Kolkata
+    groups:
+      web-minor-patch:
+        update-types: [minor, patch]
+      web-major:
+        update-types: [major]
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    labels: [dependencies]

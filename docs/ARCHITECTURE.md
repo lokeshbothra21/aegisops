@@ -33,7 +33,7 @@ flowchart LR
   LLM["Gemini Flash / Groq"] <--> AGENT
 ```
 
-**Built:** the whole left-to-right path from the demo into Postgres (collector layer, ingest API, tables), derived service edges, change events from flag toggles, deterministic alerting that opens incidents, the API with liveness/readiness and a read-only incidents endpoint, and the Cloud Run deployment. **Planned:** agent, actions, UI, Langfuse, LLM.
+**Built:** the whole path: demo → collector → ingest → Postgres, change events, deterministic alerting, the agent (investigate, verify, propose, approve, execute, post-fix check) with Langfuse tracing, public run admission, the runs API with SSE, the web UI (incidents, live investigation, approvals), and the Cloud Run deployment on Supabase. **Planned:** incident memory (E6), the benchmark and its pages (E7, E10.3–E10.4), postmortems, the UI on Vercel (E11.4).
 
 ## 3. Components
 
@@ -46,7 +46,7 @@ flowchart LR
 | `tools` package | `packages/tools/` | raw SQL + mcp SDK 2.x | Nine read-only telemetry tools (`ToolContext` for live/replay), untrusted envelope, `aegis-telemetry` MCP server over stdio; actions module (not MCP) comes in W6 | Built: tools + server (W3, E9.1) |
 | Jobs + incidents (in the API for now) | `apps/api/.../jobs`, `.../incidents` | asyncio `JobRunner`, SQL | Retention, `service_edges` derivation, flagd change watcher, Docker container watcher (deploy/restart/scale); incident state machine | Built (E1.4, E1.5, E2.1, E2.2-obs, E2.4) |
 | Alerts (in the API) | `apps/api/.../alerts` | SQL readers + `Evaluator` | Rules from `config/alerts.yaml` → `alert_rules`; every 30 s: error_rate / p95_ratio / memory / kafka lag per service → incidents via the state machine | Built (E2.3) |
-| `web` | `apps/web/` (not created) | Next.js 15, TypeScript, Tailwind, shadcn/ui | Incidents list, incident detail with live SSE timeline, Benchmark, Failures | Planned (W5) |
+| `web` | `apps/web/` | Next.js 16, React 19, TypeScript strict, Tailwind v4, Vitest, Playwright | Incidents list with scenario replay; incident detail with live SSE timeline, hypotheses, evidence check (claimed vs verified), proposed fix with operator approve/reject, outcome. The browser calls the API directly (ADR-021, ADR-022) | Built (E10.1, E10.2); Benchmark/Failures pages planned (W11); Vercel pending (E11.4) |
 | `bench` | `bench/scenarios.yaml` + `packages/bench/` | Python, httpx | Catalogue (16 scenarios), runner (fault → TTD → hold → revert → capture), fixtures export/import, replay command; metrics + report come in W9 | Built: catalogue, runner, capture, fixtures (E7.1, E7.2, E1.6) |
 | Platform | `.github/workflows/`, `Dockerfile` | GitHub Actions, WIF, Artifact Registry, Cloud Run | CI (lint, types, tests vs Postgres, hooks, docker build), CodeQL, dependency review, Dependabot, keyless deploy with probe-before-traffic | Built (E11.2, E11.3, E11.6, E9.7) |
 
@@ -108,7 +108,7 @@ Every table has `id bigserial` and `created_at`. Planned tables: `runs`, `run_ev
 
 ## 8. API surface
 
-Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `GET /api/v1/scenarios[/{key}]`, `POST /api/v1/incidents/{id}/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/events` (SSE), `POST /api/v1/runs/{id}/approve|reject`, `POST /api/v1/admin/{retention,service-edges}/run`, `POST /api/v1/admin/capture` (X-Admin-Token on mutating admin/approval routes). All errors are `application/problem+json` (RFC 7807). Planned: `/incidents`, `/runs/{id}/events` (SSE), `/runs/{id}/approve|reject` (admin token), `/scenarios`, `/bench/*`, `/admin/*`. See PROJECT.md §7.
+Built: `POST /ingest/v1/{traces,logs,metrics}`, `GET /livez`, `GET /readyz`, `GET /api/v1/incidents[?status&limit&cursor]`, `GET /api/v1/incidents/{id}`, `GET /api/v1/incidents/{id}/runs`, `GET /api/v1/scenarios[/{key}]`, `POST /api/v1/scenarios/{key}/replay`, `POST /api/v1/incidents/{id}/runs`, `GET /api/v1/runs/{id}`, `GET /api/v1/runs/{id}/events` (SSE; resumes after `?after=` or `Last-Event-ID`), `POST /api/v1/runs/{id}/approve|reject`, `POST /api/v1/admin/{retention,service-edges}/run`, `POST /api/v1/admin/capture` (X-Admin-Token on mutating admin/approval routes). CORS for the web UI's origins (`AEGIS_CORS_ORIGIN_REGEX`, ADR-021). All errors are `application/problem+json` (RFC 7807). Planned: `/bench/*`. See PROJECT.md §7.
 
 ## 9. Deployment and operations
 

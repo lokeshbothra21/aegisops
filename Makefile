@@ -2,7 +2,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-.PHONY: help install lint format typecheck test check api db-up db-down db-migrate db-revision demo-check demo-up demo-down demo-config demo-logs scenario flag clean
+.PHONY: help install lint format typecheck test check api web-install web web-check db-up db-down db-migrate db-revision demo-check demo-up demo-down demo-config demo-logs scenario flag clean
 
 help: ## Show targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}'
@@ -29,6 +29,15 @@ check: lint typecheck test ## Everything CI runs
 
 api: ## Run the API locally with reload
 	uv run uvicorn aegisops_api.main:app --app-dir apps/api/src --reload --port 8000
+
+web-install: ## Install the web UI's dependencies (apps/web, npm)
+	cd apps/web && npm ci
+
+web: ## Run the web UI on http://localhost:3000 against the local API (make api)
+	cd apps/web && NEXT_PUBLIC_API_URL=$${NEXT_PUBLIC_API_URL:-http://localhost:8000} npm run dev
+
+web-check: ## Web lint, types, unit tests and Playwright smoke tests (same as CI)
+	cd apps/web && npm run check && npx playwright test
 
 db-up: ## Start local Postgres (pgvector) on port 5433
 	docker compose up -d --wait postgres

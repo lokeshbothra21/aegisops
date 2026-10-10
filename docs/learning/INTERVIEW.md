@@ -49,6 +49,12 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - ★ **How do you debug a wrong answer from the agent?** Open its Langfuse trace: every node's exact prompt, structured answer and answering model; the verifier's span shows what it dropped; scores show claimed vs verified. (Day 18)
 - **Why instrument at seams instead of decorating every node?** One wrapper each for the model client, tool runner and node keeps agent logic tracing-free; nesting comes from the OTel context. (ADR-019)
 
+## Web UI
+- ★ **How does the UI show a run live, and survive a dropped connection?** EventSource on the run's SSE stream; events merged by seq (duplicates harmless); on close, check the run's status and reconnect with the last seq only if still running. (Day 20)
+- **Where does the logic live so it is testable?** Pure functions (reducer, step states, evidence view) outside components; Vitest for them, Playwright smoke tests for pages. (Day 20)
+- **How do you test a UI against a slow, paid, nondeterministic backend?** Network-level mocks with payloads recorded from real runs, desktop and phone profiles, plus one manual pass against the real API. (Day 20)
+- **Why Next.js 16 when the plan said 15?** 15 bundles a PostCSS version with high advisories that fail dependency review; take security releases (16.3.8) promptly, let feature releases settle. (Day 20, ADR-022)
+
 ## Tools and MCP
 - **Why do tools return ≤ 4 KB?** Token budget and reasoning quality; aggregate in SQL. (Day 10)
 - **How do the same tools serve live and replay?** `scenario_id` filter + frozen `now` in the tool context; identical code.
