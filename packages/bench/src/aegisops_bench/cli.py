@@ -43,7 +43,10 @@ async def _run(args: argparse.Namespace) -> int:
     cat = load_catalogue(args.catalogue)
     spec = cat.get(args.key)
     runner = Runner(
-        api=args.api.rstrip("/"), admin_token=args.admin_token, flagd_path=Path(args.flagd)
+        api=args.api.rstrip("/"),
+        admin_token=args.admin_token,
+        flagd_path=Path(args.flagd),
+        ingest_token=args.ingest_token,
     )
     rep = await runner.run(spec)
     print(json.dumps(rep.model_dump(mode="json"), indent=2))
@@ -185,6 +188,7 @@ def main() -> None:
     r.add_argument("key")
     r.add_argument("--api", default=os.environ.get("AEGIS_API", "http://localhost:8000"))
     r.add_argument("--admin-token", default=os.environ.get("AEGIS_ADMIN_TOKEN", ""))
+    r.add_argument("--ingest-token", default=os.environ.get("AEGIS_INGEST_TOKEN", ""))
     r.add_argument("--flagd", default=os.environ.get("AEGIS_FLAGD_CONFIG_PATH", str(FLAGD)))
     e = sub.add_parser("export")
     e.add_argument("key")

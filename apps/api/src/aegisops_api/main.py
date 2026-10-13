@@ -68,7 +68,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             )
     if settings.jobs_enabled:
         runner.start()
-    log.info("api.start", env=settings.env, version=__version__, jobs=settings.jobs_enabled)
+    ingest = "token" if settings.ingest_token else "open"
+    if not settings.ingest_token and settings.env == "prod":
+        ingest = "disabled"
+    log.info(
+        "api.start",
+        env=settings.env,
+        version=__version__,
+        jobs=settings.jobs_enabled,
+        ingest=ingest,
+    )
     try:
         yield
     finally:

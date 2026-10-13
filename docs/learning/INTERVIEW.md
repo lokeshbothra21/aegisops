@@ -107,6 +107,9 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - ★ **Why not proxy the API through Vercel to avoid CORS?** Per-visitor limits key on the client address Google's front end records; behind a proxy every visitor is Vercel's IP. Plus streaming limits, and no secret to hide. (Day 20, ADR-021)
 - **Is CORS a security control?** It protects browser users from other sites reading responses with their credentials; it does not protect the API from scripts. Auth does. (Day 20)
 - **Where do secrets live?** Never in the repo; env/Secret Manager in prod; GitHub variables only for non-secret ids.
+- ★ **How do you authenticate telemetry producers?** `Authorization: Bearer` from the Collector's `headers:` setting; checked in a router dependency before the body is read, compared with `hmac.compare_digest`, 401 + `WWW-Authenticate`; unset in prod → 503, fail closed. (Day 22, ADR-024)
+- **Why check auth before reading the body?** An unauthenticated sender should cost nothing; the body may be gzip and a zip bomb is cheap to send, expensive to unpack. (Day 22)
+- **Why is `==` wrong for comparing tokens?** It returns at the first mismatch, so timing leaks a prefix; use a constant-time compare. (Day 22)
 
 ## Evaluation (planned, Weeks 4–11)
 - **How do you make an incident benchmark reproducible?** Scenarios as data, a runner that records timestamps, tagged capture windows, importable fixtures, replay with a frozen clock. (Day 13)

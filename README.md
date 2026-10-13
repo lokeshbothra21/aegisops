@@ -64,7 +64,7 @@ Not yet. The benchmark (12 faults + 3 noise scenarios × 3 episodes × 4 agent v
 1. **Detection and verification are deterministic code.** The LLM proposes; code decides there is an incident and checks every claim (ADR-008).
 2. **Telemetry is untrusted input.** Every tool result is wrapped in `<telemetry untrusted="true">` with escaped brackets; prompts state that content inside is never an instruction. A prompt-injection scenario (S13) is part of the benchmark.
 3. **Actions are unreachable without approval.** Read tools are exposed over MCP; the four actions (toggle flag, restart, scale, rollback) are an in-process module reachable only from the `execute` node after `approval`, enforced by graph topology and a test (ADR-007).
-4. **Least privilege everywhere.** Node-scoped tool allowlists; allowlisted action parameters with fixed argv, no shell; admin routes fail closed; keyless cloud deploys via Workload Identity Federation restricted to this repository.
+4. **Least privilege everywhere.** Node-scoped tool allowlists; allowlisted action parameters with fixed argv, no shell; admin routes and ingest fail closed (ingest needs a bearer token in production, checked before the body is read); keyless cloud deploys via Workload Identity Federation restricted to this repository.
 5. **Supply chain.** Lockfiles, Dependabot, dependency review (vulnerabilities + licences), CodeQL on code and workflows, secret scanning, actions pinned by SHA.
 
 Details: [`docs/PROJECT.md` §11](docs/PROJECT.md) (threat model); `docs/SECURITY.md` in Week 13.
@@ -98,7 +98,7 @@ uv run aegis-investigate ... --recorded packages/agent/tests/cassettes/s1_paymen
 uv run aegis-telemetry                         # the read tools as an MCP server (stdio)
 curl -X POST localhost:8000/api/v1/incidents/<id>/runs -d '{}' -H 'content-type: application/json'   # start a run
 curl -N localhost:8000/api/v1/runs/<run>/events   # live SSE stream; approve with POST /runs/<run>/approve
-make check                                     # lint, types, 188 tests against Postgres (same as CI)
+make check                                     # lint, types, 201 tests against Postgres (same as CI)
 make web-check                                 # web lint, types, 24 unit + 6 Playwright tests
 ```
 
@@ -134,7 +134,7 @@ Or **self-host**: it is Apache-2.0, so the whole system can run inside the compa
 
 ## Tech stack
 
-Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (188 tests) · Next.js 16 · React 19 · Tailwind v4 · Vitest · Playwright · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
+Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (201 tests) · Next.js 16 · React 19 · Tailwind v4 · Vitest · Playwright · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
 
 ## Repository map
 

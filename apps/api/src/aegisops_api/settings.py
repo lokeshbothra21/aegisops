@@ -125,6 +125,13 @@ class Settings(BaseSettings):
         description="Healthy ticks before an un-investigated incident auto-resolves.",
     )
 
+    ingest_token: SecretStr | None = Field(
+        default=None,
+        description=(
+            "Bearer token producers send to /ingest (E9.8, ADR-024). Unset = open on a laptop "
+            "(local/test), 503 in prod, so a deploy without one fails closed."
+        ),
+    )
     ingest_max_body_bytes: int = Field(
         default=16 * 1024 * 1024,
         ge=1024,

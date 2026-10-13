@@ -8,6 +8,7 @@ services:
       - ../aegisops/infra/otel-demo/otelcol-config-extras.yml:/etc/otelcol-config-extras.yml
     environment:
       - AEGISOPS_INGEST_ENDPOINT
+      - AEGISOPS_INGEST_TOKEN
     extra_hosts:
       - "host.docker.internal:host-gateway"  # no-op on OrbStack/Docker Desktop, needed on Linux
 

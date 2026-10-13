@@ -9,17 +9,23 @@ Contract (https://opentelemetry.io/docs/specs/otlp/#otlphttp):
 - Client faults are 4xx problem+json and the collector will not retry them;
   5xx (DB down) makes it retry with backoff, so nothing is lost on a blip.
 
+Auth (E9.8, ADR-024): `Authorization: Bearer <AEGIS_INGEST_TOKEN>`, checked before the
+body is read, so an unauthenticated sender cannot make us decompress anything. With no
+token configured the routes are open on a laptop (`env` local/test: the only producer is
+our own collector on the same machine) and answer 503 in prod.
+
 Handlers only decode the body and hand off; parsing lives in `ingest.otlp`,
 mapping in `ingest.convert`, SQL in `ingest.store` (PROJECT.md §14.3).
 """
 
 import gzip
+import hmac
 import zlib
 from collections.abc import Awaitable, Callable
 from typing import Annotated, Any
 
 import structlog
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Depends, Header, Request, status
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -30,7 +36,36 @@ from aegisops_api.ingest.convert import Row
 from aegisops_api.settings import Settings
 
 log = structlog.get_logger()
-router = APIRouter(prefix="/ingest/v1", tags=["ingest"])
+
+
+def require_ingest_token(
+    request: Request, authorization: Annotated[str | None, Header()] = None
+) -> None:
+    settings: Settings = request.app.state.settings
+    expected = settings.ingest_token.get_secret_value() if settings.ingest_token else ""
+    if not expected:
+        if settings.env == "prod":
+            raise ProblemError(
+                status.HTTP_503_SERVICE_UNAVAILABLE,
+                "Ingest disabled",
+                "AEGIS_INGEST_TOKEN is not configured on this deployment.",
+            )
+        return
+    scheme, _, given = (authorization or "").partition(" ")
+    if scheme.lower() != "bearer" or not hmac.compare_digest(
+        given.strip().encode(), expected.encode()
+    ):
+        raise ProblemError(
+            status.HTTP_401_UNAUTHORIZED,
+            "Unauthorized",
+            "send Authorization: Bearer <ingest token>",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+router = APIRouter(
+    prefix="/ingest/v1", tags=["ingest"], dependencies=[Depends(require_ingest_token)]
+)
 
 
 def export_response(counter: str, rejected: int, message: str) -> dict[str, Any]:

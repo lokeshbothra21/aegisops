@@ -117,6 +117,7 @@ class FakeAPI:
         self.reverted = False
         self.captures: list[dict] = []  # type: ignore[type-arg]
         self.ingested: list[dict] = []  # type: ignore[type-arg]
+        self.ingest_auth: list[str | None] = []
 
     def handler(self, req: httpx.Request) -> httpx.Response:
         path = req.url.path
@@ -156,6 +157,7 @@ class FakeAPI:
                 json={"key": "S1", "window_start": "x", "window_end": "y", "tagged": {"spans": 10}},
             )
         if path == "/ingest/v1/logs":
+            self.ingest_auth.append(req.headers.get("Authorization"))
             self.ingested.append(json.loads(req.read()))
             return httpx.Response(200, json={})
         return httpx.Response(404)
@@ -191,6 +193,7 @@ async def test_runner_drives_a_flag_scenario_end_to_end(tmp_path: Path) -> None:
         api="http://api",
         admin_token="tok",
         flagd_path=flagd,
+        ingest_token="ingest-tok",
         http=httpx.AsyncClient(transport=httpx.MockTransport(fake.handler), base_url="http://api"),
         sleep=fake_sleep,
         now=lambda: clock["t"],
@@ -212,6 +215,7 @@ async def test_runner_drives_a_flag_scenario_end_to_end(tmp_path: Path) -> None:
     assert fake.ingested[0]["resourceLogs"][0]["scopeLogs"][0]["logRecords"][0]["body"][
         "stringValue"
     ].startswith("SYSTEM NOTICE")
+    assert fake.ingest_auth == ["Bearer ingest-tok"]
     assert slept[0] == spec.timing.warmup_s and spec.timing.hold_s in slept
 
 

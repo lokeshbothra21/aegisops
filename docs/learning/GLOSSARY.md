@@ -4,6 +4,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 
 | Term | Meaning | Day |
 |---|---|---|
+| 401 vs 403 | 401: unknown who you are (missing/wrong credentials); 403: known, and not allowed | D22 |
 | 429 Too Many Requests | HTTP status for "over a limit"; `Retry-After` says how many seconds to wait | D17 |
 | Ablation | Removing one component to measure its contribution; variants A/B/C/D of the agent | D0 |
 | Admission control | The gate before work starts that applies limits; we limit runs, not requests | D17 |
@@ -20,6 +21,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Atomic state + event | Write a state change and the event describing it in one transaction: both or neither | D17 |
 | Attribute (OTel) | Key/value fact on a resource, scope, span, log or metric point | D3 |
 | Batching | Grouping items into one request; exporter batches ~200–1000 items | D4 |
+| Bearer token | Secret in `Authorization: Bearer <token>`; whoever holds it gets in, so HTTPS only and never logged | D22 |
 | Budget alert | GCP billing alert; ours ₹500 at 50 %, 100 %, forecast | D5 |
 | Cache (CI) | Reused files across runs keyed on a hash (uv.lock, Docker layers) | D5 |
 | Cached-run fallback | Past the cap, serve the incident's last finished run instead of an error | D17 |
@@ -32,6 +34,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Concurrency group | Cancels or serialises workflow runs on the same ref | D5 |
 | Connection pool | Reused DB connections; `pool_pre_ping` detects dead ones | D2 |
 | Connector (collector) | Exporter of one pipeline that is the receiver of another (span_metrics) | D4 |
+| Constant-time comparison | Comparing secrets in time independent of the input (`hmac.compare_digest`), so timing leaks nothing | D22 |
 | Content-Encoding gzip | Compressed request body; server must inflate; check size before and after | D3 |
 | Context propagation | OTel keeps the current span in a contextvar that follows `await`; children nest automatically | D18 |
 | Conventional Commits | `type(scope): message` commit format | D1 |
@@ -59,6 +62,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Exporter / flush | Spans are batched and sent by a background exporter; flush forces the buffer out now | D18 |
 | Fan-out | One receiver feeding several pipelines | D4 |
 | FastAPI | Async Python web framework with Pydantic validation and OpenAPI | D1 |
+| FastAPI dependency | Function run before a route handler; on a router it guards every route and can reject early | D22 |
 | Fault injection | Deliberately breaking a system (flag toggle) to test response | D4 |
 | Feature flag / flagd | Runtime switch; flagd serves flags from a JSON file it hot-reloads | D0 |
 | Fixture (test) | Reusable test data/setup | D3 |
@@ -80,7 +84,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | IAM role / service account | Google permission bundles / non-human identities | D5 |
 | Inbound = outbound | Contributions come in under the same licence the project goes out under (Apache-2.0 §5) | D19 |
 | Incoming webhook | Slack: a secret URL that can post into one channel; deleting it removes the integration | D21 |
-| Ingest token | Secret a producer sends with each request so `/ingest` accepts only known senders; store its hash (E9.8) | D21 |
+| Ingest token | Secret a producer sends with each request so `/ingest` accepts only known senders; hash it once tokens are per customer (E9.8, ADR-024) | D21 |
 | Integration test | Test against the real Postgres container | D2 |
 | Issue forms | YAML issue templates with required fields and dropdowns, so reports arrive complete | D19 |
 | JSONB | Postgres binary JSON column; `attrs` | D2 |
@@ -168,6 +172,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Temporality | CUMULATIVE vs DELTA for sums/histograms | D3 |
 | 12-factor config | Config from environment variables only | D1 |
 | 413 / 415 | Payload too large / unsupported media type | D3 |
+| Timing attack | Recovering a secret from tiny differences in how long rejections take | D22 |
 | Trace / span | Trace = one run's story; span = one timed step in it with a parent and attributes | D18 |
 | TracerProvider | OTel factory for spans; one global per process, or a dedicated one for isolation | D18 |
 | useSyncExternalStore | React hook for a value living outside React (the operator token) | D20 |
@@ -308,3 +313,4 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Readiness gate | Traffic shifts only when /readyz (DB reachable) answers 200 | D16 |
 | Secret Manager / --set-secrets | Versioned secrets injected into Cloud Run at start; never in repo or logs | D16 |
 | X-Forwarded-For | Proxy header listing client IPs; only the right-most, proxy-appended entry is trusted | D17 |
+| Zip bomb | Small compressed body that expands enormously; defence: authenticate first, cap decompressed size | D22 |

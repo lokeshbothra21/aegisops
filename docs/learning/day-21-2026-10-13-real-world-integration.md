@@ -13,7 +13,7 @@ Today, on the laptop, the demo's Collector has one extra exporter we added (`inf
 
 A company does the same: add one exporter block to the Collector they already run, pointing at our `/ingest` URL with a **token in a header**. Their Collector can drop fields and redact personal data *before* anything leaves. This is exactly how hosted observability vendors onboard customers.
 
-**Gap found while answering this:** our `/ingest` has no authentication today. It was designed for one producer on the same machine (ADR-013). Before any other producer uses it, it needs an ingest token: the Collector sends it, the API stores only its hash and answers 401 without it. Now planned as **E9.8**.
+**Gap found while answering this:** our `/ingest` has no authentication today. It was designed for one producer on the same machine (ADR-013). Before any other producer uses it, it needs an ingest token: the Collector sends it, and the API answers 401 without it. Now planned as **E9.8** (built the same day: Day 22, ADR-024).
 
 ### 2. Knowing what changed: they tell us
 Today's watchers only work because everything is on one machine:
@@ -61,7 +61,7 @@ The **alert evaluator** that uses this number is not an AI and not an agent tool
 
 **Push vs pull integration.** Push: the source sends data to you (their Collector exports to our URL). Pull: you fetch it from them, which needs credentials into their systems. Push keeps the customer in control.
 
-**Ingest token.** A secret the sender includes with every request so the receiver accepts only data from known producers. Store a hash, not the token.
+**Ingest token.** A secret the sender includes with every request so the receiver accepts only data from known producers. Once there is one per customer, store hashes, not the tokens.
 
 **Webhook.** "Call this URL when X happens." A tool sends an HTTP POST to an address you registered. Used for flag changes, deploys and Slack messages.
 
@@ -78,7 +78,7 @@ The **alert evaluator** that uses this number is not an AI and not an agent tool
 **Egress-only.** A network rule that allows connections *out* but not *in*. Outbound-only integrations work behind such rules without opening a port.
 
 ## Honest gaps
-- **None of the company-side pieces exist yet:** no ingest token, no change endpoint, no Slack, no runner. They're in PROJECT.md §25 (the ingest token is scheduled as E9.8).
+- **Only the ingest token exists** (built the same day, Day 22). No change endpoint, no Slack, no runner. They're in PROJECT.md §25 (the ingest token is scheduled as E9.8).
 - **Trust can't be built in code.** A company sending production data to an unknown vendor needs security certifications (SOC 2), contracts and a track record. Until then, self-hosting is the realistic path.
 
 ## Interview questions

@@ -4,6 +4,7 @@
 503 rather than silently allowing, so a misconfigured deploy fails closed.
 """
 
+import hmac
 from datetime import timedelta
 from typing import Annotated
 
@@ -31,7 +32,7 @@ def require_admin(request: Request, x_admin_token: Annotated[str | None, Header(
             "Admin disabled",
             "AEGIS_ADMIN_TOKEN is not configured on this deployment.",
         )
-    if x_admin_token != expected:
+    if not hmac.compare_digest((x_admin_token or "").encode(), expected.encode()):
         raise ProblemError(
             status.HTTP_401_UNAUTHORIZED, "Unauthorized", "missing or wrong X-Admin-Token"
         )

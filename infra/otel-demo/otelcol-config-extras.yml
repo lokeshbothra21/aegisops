@@ -21,6 +21,10 @@ exporters:
   otlphttp/aegisops:
     # The API runs on the host (`make api`); `/v1/{traces,logs,metrics}` is appended.
     endpoint: ${env:AEGISOPS_INGEST_ENDPOINT}
+    # E9.8: the API checks this when AEGIS_INGEST_TOKEN is set (and ignores it when not, so
+    # an empty token is fine on a laptop). Same value as the API's AEGIS_INGEST_TOKEN.
+    headers:
+      Authorization: "Bearer ${env:AEGISOPS_INGEST_TOKEN}"
     encoding: json
     compression: gzip
     timeout: 10s

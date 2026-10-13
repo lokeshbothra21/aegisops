@@ -49,6 +49,7 @@ class Runner:
     api: str
     admin_token: str
     flagd_path: Path
+    ingest_token: str = ""  # Authorization: Bearer for /ingest when the API sets one (E9.8)
     http: httpx.AsyncClient = field(default_factory=lambda: httpx.AsyncClient(timeout=30))
     sleep: Any = asyncio.sleep  # injectable for tests
     now: Any = lambda: datetime.now(UTC)
@@ -98,7 +99,8 @@ class Runner:
                 }
             ]
         }
-        r = await self.http.post(f"{self.api}/ingest/v1/logs", json=payload)
+        headers = {"Authorization": f"Bearer {self.ingest_token}"} if self.ingest_token else {}
+        r = await self.http.post(f"{self.api}/ingest/v1/logs", json=payload, headers=headers)
         r.raise_for_status()
 
     async def wait_for_incident(

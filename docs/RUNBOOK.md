@@ -32,6 +32,8 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 
 | Situation | Action |
 |---|---|
+| Collector export fails with 401 (`ingest` warnings in its logs) | The API has `AEGIS_INGEST_TOKEN` set and the collector sent none or another value. Set `AEGISOPS_INGEST_TOKEN` to the same value (shell or `infra/otel-demo/aegisops.env`), then `make demo-up`. The collector does not retry 4xx, so those batches are lost. |
+| `/ingest` answers 503 "Ingest disabled" | `AEGIS_ENV=prod` with no `AEGIS_INGEST_TOKEN`: fails closed by design. Production gets data from scenario imports, not ingest. For a real producer, add the secret (`aegis-ingest-token`) and mount it. |
 | Local DB growing / disk | Retention runs hourly in the API while it is up; force it: `curl -X POST -H "X-Admin-Token: $AEGIS_ADMIN_TOKEN" localhost:8000/api/v1/admin/retention/run`. Tagged (`scenario_id`) rows are never deleted. |
 | `service_edges` empty or stale | Refreshed every 15 min for the current + previous hour. Force: `POST /api/v1/admin/service-edges/run?hours=N` (N ≤ 48). Edges need parent→child spans across services; an INTERNAL-only trace produces none. |
 | Admin route answers 503 "Admin disabled" | `AEGIS_ADMIN_TOKEN` is unset on that deployment. Set it (Secret Manager in prod) and redeploy. 401 means the header is missing or wrong. |
