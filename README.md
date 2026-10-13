@@ -118,6 +118,20 @@ uv run aegis-scenario export S1                # bench/fixtures/S1.jsonl.gz for 
 
 Shard ingest by service and sample harder at the collector; keep the span-metrics counters (they are the exact signal) and drop raw span retention to hours; put a queue and a worker pool in front of the agent instead of running it inside the SSE request (ADR-009 is a free-tier choice); per-tenant budgets and model routing; tiered storage (hot Postgres, cold object store) with `service_edges` and postmortems as the durable, small tables; read replicas for the tools. None of the agent code changes: the tool layer and the deployment do.
 
+## In a real company
+
+Today AegisOps and its target share one machine: the watchers read a local file and the local Docker socket, and actions use the same. A company will not open its network to a third party, so outside the laptop **every connection is opened from the company's side, carries only what it chooses to send, and can be revoked by the company** ([ADR-023](docs/adr/ADR-023-outbound-only-integration.md)):
+
+| Need | Today (one machine) | In a company |
+|---|---|---|
+| Telemetry in | The demo's Collector posts to `/ingest` | Their own OTel Collector exports to `/ingest` with an ingest token; filtering and PII redaction happen in their Collector first. No account, no inbound access: OpenTelemetry is an open standard, and this is how hosted observability vendors onboard. |
+| Changes in | Watchers poll a flag file and the Docker socket | Pushed: a CI/CD step posts each deploy; flag tools call a webhook on each flip; Kubernetes events arrive through their Collector |
+| Notify a human | Web UI and API | Posts to a Slack incoming webhook or PagerDuty key **they** create (one channel, revocable); approve and reject buttons call back to the API |
+| Act | In-process actions on the same host | A small runner **inside their network** polls for approved actions, runs only the four allowlisted ones with credentials that never leave, and reports back (the self-hosted CI runner / GitOps agent pattern) |
+| Pull requests | None: remediation is operational, not code (ADR-005) | If ever: a GitHub App they install on chosen repositories; AegisOps opens a PR, their CI and reviewers decide |
+
+Or **self-host**: it is Apache-2.0, so the whole system can run inside the company's network and no data leaves. The agent and verifier read the same four tables either way. Only who writes them changes.
+
 ## Tech stack
 
 Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (188 tests) · Next.js 16 · React 19 · Tailwind v4 · Vitest · Playwright · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.

@@ -32,3 +32,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [18](day-18-2026-10-10-langfuse-tracing.md) | 10 Oct | Langfuse tracing: one trace per run, node spans, generations, tools, scores | #39 |
 | [19](day-19-2026-10-10-open-to-contributors.md) | 10 Oct | Opening the repo: CONTRIBUTING, SECURITY, code of conduct, issue forms, DCO check, topics, starter issues | #43 |
 | [20](day-20-2026-10-10-web-ui.md) | 10 Oct | Web UI: direct browser calls (CORS, ADR-021), live investigation page, evidence panel, approvals, Vitest + Playwright (ADR-022) | #51–#52 |
+| [21](day-21-2026-10-13-real-world-integration.md) | 13 Oct | How it would plug into a real company: pushed telemetry and changes, customer-created notification endpoints, a runner inside their network, no PRs by design (ADR-023); the error-rate formula explained | this PR |

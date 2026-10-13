@@ -10,6 +10,10 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - ★ **Why rollback-first, no code patches?** Restore before fix is SRE practice; a fixed action set can be allowlisted and validated. (ADR-005)
 - ★ **Why MCP for reads but not actions?** Authorization by topology: actions live in a module reachable only from `execute`, which follows `approval`. (ADR-007)
 - ★ **How would this scale to 10K services / 1,000 incidents a day?** Shard ingest by service, sample harder, queue in front of the agent with a worker pool, per-tenant budgets, tiered storage (hot Postgres, cold object store), read replicas for tools.
+- ★ **How would a real company connect to it?** Everything is outbound from their side: their own OTel Collector exports to `/ingest` with a token (no account, no inbound access), changes are pushed by CI/CD steps and flag-tool webhooks, and notifications go to endpoints they create (Slack incoming webhook, PagerDuty key). Or self-host the Apache-2.0 code. (Day 21, ADR-023)
+- ★ **How do you act on their systems without access to their network?** A runner inside their network polls for approved actions over HTTPS, runs only the allowlisted ones with local credentials, and reports back: the self-hosted CI runner / GitOps pattern. We never hold their credentials. (Day 21)
+- **Does it open pull requests?** No, by design: remediation is operational (ADR-005). If ever, through a GitHub App the customer installs and scopes; their CI and reviewers decide. (Day 21)
+- **Why would anyone trust you with production telemetry?** At first they shouldn't have to: self-host. A hosted version needs certifications and contracts, which is a business problem. (Day 21)
 
 ## Telemetry and ingestion
 - **Explain logs, metrics, traces and how they link.** Trace/span ids on logs; span-metrics derived from traces; `service` on everything.
@@ -67,6 +71,7 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **How do you avoid flapping?** `for` windows before firing, recovery windows before resolving, one active incident per service.
 - **Why a p95 ratio to a baseline rather than a fixed threshold?** Endpoints differ 100× in normal latency; a ratio catches regressions everywhere with one rule.
 - **Where does a 60 s detection budget go?** ~6 s sampling wait + ~10 s export interval + ≤30 s to the next tick, ×`for_windows`.
+- **What exactly is the error-rate formula, and what runs it?** Failed ÷ total server-span calls per service over 2 min, from counter deltas (latest − last before the window; a drop means a reset), only with ≥ 5 calls. The alert evaluator, a background loop in the API every 15 s (not an LLM, not an agent tool), compares it with the rule and counts consecutive breaches. (Days 8, 21)
 
 ## Incidents and change tracking
 - **How do you prevent duplicate incidents for one outage?** `active_incident(service)` returns the open one; the evaluator attaches rather than opens.

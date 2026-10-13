@@ -38,6 +38,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Coordinated disclosure | Reporter tells the maintainer privately, the fix ships, then the issue is published | D19 |
 | CORS | Response headers by which an API lets other origins read it; enforced by browsers, not auth | D20 |
 | Coverage | Share of code lines executed by tests | D3 |
+| Customer-side runner | Small agent inside a customer's network that polls for approved actions over HTTPS and runs them with local credentials (ADR-023) | D21 |
 | DCO (Developer Certificate of Origin) | A `Signed-off-by:` line per commit certifying you may submit the code under the project licence | D19 |
 | Decorator pattern | Wrap an object in one with the same interface that adds behaviour (`TracedLLM` records, delegates) | D18 |
 | Dependabot | GitHub bot for vulnerability alerts and scheduled dependency-update PRs | D5 |
@@ -49,6 +50,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Device emulation | Browser with a phone's viewport and pixel ratio; honest mobile checks | D20 |
 | Docker Compose / override | Multi-container config; later `-f` files merge over earlier ones | D2, D4 |
 | docker_stats receiver | Collector receiver scraping container CPU/memory from the Docker socket | D4 |
+| Egress-only | Network rule allowing connections out but not in; outbound-only integrations work behind it | D21 |
 | Entrypoint script | Container start script: migrate if DB configured, then `exec uvicorn` | D5 |
 | EventSource | Browser's built-in SSE client; parses event/data/id lines, reconnects by itself | D20 |
 | Evidence verification | Code checks every LLM-cited reference exists and numbers are within ±20 % | D0 |
@@ -66,6 +68,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Generation (Langfuse) | Observation for one model call: prompt, answer, model, tokens, cost | D18 |
 | GFE (Google Frontend) | Google's edge proxy for run.app; reserves `/healthz` | D5 |
 | GitHub Actions | GitHub CI/CD: workflows → jobs → steps, triggered by events | D5 |
+| GitHub App | Integration an owner installs on chosen repositories with chosen permissions; revocable | D21 |
 | GitHub variables vs secrets | Non-secret config vs encrypted, masked values | D5 |
 | Good first issue | Label for small, well-described tasks that need no deep context; GitHub lists them for newcomers | D19 |
 | Head vs tail sampling | Per-span decision on arrival vs per-trace decision after buffering | D4 |
@@ -76,6 +79,8 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | host.docker.internal | Hostname resolving to the host from inside a container | D4 |
 | IAM role / service account | Google permission bundles / non-human identities | D5 |
 | Inbound = outbound | Contributions come in under the same licence the project goes out under (Apache-2.0 §5) | D19 |
+| Incoming webhook | Slack: a secret URL that can post into one channel; deleting it removes the integration | D21 |
+| Ingest token | Secret a producer sends with each request so `/ingest` accepts only known senders; store its hash (E9.8) | D21 |
 | Integration test | Test against the real Postgres container | D2 |
 | Issue forms | YAML issue templates with required fields and dropdowns, so reports arrive complete | D19 |
 | JSONB | Postgres binary JSON column; `attrs` | D2 |
@@ -123,6 +128,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Protobuf | Binary schema-based serialisation; OTLP's native format | D3 |
 | Pure function | No I/O; output depends only on input (`convert.py`) | D3 |
 | Pure function / reducer | Same input, same output, no side effects; turns events into page state | D20 |
+| Push vs pull integration | Push: the source sends to you. Pull: you fetch from it, which needs credentials into its systems | D21 |
 | Pydantic | Validation from type hints; every boundary is a model | D1 |
 | Race condition | Result depends on timing, e.g. two instances both take the last slot | D17 |
 | React effect | Post-render code syncing with the outside; don't set state synchronously in it | D20 |
@@ -131,6 +137,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Receiver (collector) | Input of a pipeline (otlp, docker_stats) | D4 |
 | Replay mode | Serve captured telemetry by `scenario_id`; same code path as live | D0 |
 | Repository topics | Tags on a GitHub repo that put it on topic pages and in search filters | D19 |
+| Request signature | HMAC of the request body with a shared secret, in a header; proves who sent it and that it was not altered | D21 |
 | Resource / scope (OTel) | Producer identity / instrumentation library | D3 |
 | Retention | Delete untagged rows after 24 h | D2 |
 | Reverse proxy | Server forwarding requests to another; hides the backend and the client's address | D20 |
@@ -144,6 +151,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Schema drift test | Asserts live DB equals ORM models | D2 |
 | Score (Langfuse) | A number attached to a trace, chartable across runs (claimed vs verified confidence) | D18 |
 | Security release | Patch published to fix vulnerabilities; take it at once | D20 |
+| Self-hosting | Running the software on your own infrastructure so data never leaves your network | D21 |
 | Semantic conventions | Standard OTel attribute names | D3 |
 | Service container (CI) | Sidecar container (Postgres) for a job | D5 |
 | sessionStorage | Per-tab browser storage, cleared on close; holds the operator token | D20 |
@@ -165,6 +173,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | useSyncExternalStore | React hook for a value living outside React (the operator token) | D20 |
 | uv / workspace | Fast Python project manager; multi-package repo with one lockfile | D1 |
 | Version pinning | Fixed demo tag 3.0.0 checked by `make demo-check` | D4 |
+| Webhook | "Call this URL when X happens": an HTTP POST a tool sends to an address you registered | D21 |
 | WIF | Workload Identity Federation: swap GitHub's OIDC token for Google credentials, keyless | D5 |
 | Admin token (`X-Admin-Token`) | Shared-secret header auth for mutating routes; unset → 503 (fail closed) | D6 |
 | CTE (`WITH ... AS`) | Named subquery inside a statement | D6 |

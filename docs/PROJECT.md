@@ -202,7 +202,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 |---|---|---|---|---|
 | E8.1 | Langfuse tracing per run, node spans, token/cost | M | W4 | done (PR #39: run = trace, node = chain span, generations with tokens/cost, tool observations, claimed/verified scores; ADR-019) |
 | E8.2 | OTel instrumentation of `aegisops-api` (FastAPI, SQLAlchemy, httpx) | M | W4 | todo |
-| E8.3 | Cost/latency per run in UI | M | W5 | todo |
+| E8.3 | Cost/latency per run in UI | M | W5 | done (PR #52: `RunStats` on the incident page: tokens, cost, duration, tool calls) |
 | E8.4 | Health endpoints `/livez`, `/readyz`; uptime ping | M | W1 | done (probes PR #1; uptime cron PR #17, requires /readyz since PR #29) |
 
 ### E9 — Security
@@ -215,6 +215,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | E9.5 | S13 prompt-injection scenario test | M | W10 | todo |
 | E9.6 | Audit log | M | W6 | done (PR #28) |
 | E9.7 | CodeQL, dependency review, secret scanning enabled | M | W1 | done (PR #7) |
+| E9.8 | Ingest token on `/ingest/v1/*` (Collector sends it as a header; hash stored; 401 without it) | M | W5 | todo (ADR-023: needed before any producer other than our local Collector) |
 
 ### E10 — UI
 | ID | Feature | Pri | Week | Status |
@@ -241,7 +242,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | E12.1 | README (§18.1 structure) | M | W13 | living since PR #24 (results/GIF/video slots marked "not yet"); polish W13 |
 | E12.2 | `docs/ARCHITECTURE.md` with diagrams | M | W13 | started as a living doc (PR #13); polish W13 |
 | E12.3 | `docs/EVAL.md`, `docs/SECURITY.md`, `docs/FAILURES.md`, `docs/RUNBOOK.md` | M | W13 | todo |
-| E12.4 | ADRs in `docs/adr/` | M | ongoing | ADR-001–020 written; add one per new decision |
+| E12.4 | ADRs in `docs/adr/` | M | ongoing | ADR-001–023 written; add one per new decision |
 | E12.5 | 2-minute demo video | M | W13 | todo |
 | E12.6 | Blog post on evaluation results | S | Jan | todo |
 | E12.7 | Portfolio site (minimal, §18.4) | S | W13/Jan | todo |
@@ -866,6 +867,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 | 1.0.22 | 10 Oct 2026 | W4 D1: **E12.8 open to contributors** (§14.1 items that were missing): `CONTRIBUTING.md` (safety model as four non-negotiable rules; setup needs only Postgres because tests replay cassettes; Conventional Commits; sign-off), `SECURITY.md` (private vulnerability reporting, 7-day acknowledgement, scope from §11: approval bypass, working prompt injection, parameter injection, admission bypass, secrets), `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1), issue forms (bug, feature with safety checkbox, contact links), PR template sign-off box. **ADR-020: DCO, not a CLA**; `dco.yml` checks every PR commit for `Signed-off-by` via the API (read-only token, no third-party action; Dependabot signs off itself). Repo topics set, private vulnerability reporting enabled, starter issues opened. README: Contributing section, test count 181. Biggest remaining barrier to trying it: no one-command replay until fixtures ship with the first release (E11.7). |
 | 1.0.23 | 10 Oct 2026 | W4 D1: API support for the web UI (**ADR-021**: the browser calls the API directly, not through a Vercel proxy, so `X-Forwarded-For` still identifies each visitor and SSE streams are not cut by function limits). `CORSMiddleware` with one full-match origin regex `AEGIS_CORS_ORIGIN_REGEX` (default localhost/127.0.0.1 any port), GET/POST, headers `Content-Type`, `X-Admin-Token`, `Last-Event-ID`, exposes `Retry-After`, no credentials. `GET /incidents/{id}/runs` (newest first). SSE honours `Last-Event-ID` (EventSource reconnects resume). Also: Dependabot round (#36, #48, #50; #35 closed, Python 3.14 ignored) and the **first outside contribution**, #49 `aegis-scenario show` by @AnushreeKasturi (closes #45). 188 tests. |
 | 1.0.24 | 10 Oct 2026 | W4 D1 (a week early: W5 items): **E10.1 + E10.2 web UI** (`apps/web`, ADR-022). Next.js **16.3.8** not 15 (15.5 bundles PostCSS with high advisories that fail our dependency review; 16.3.0–16.3.7 had critical ones fixed in 16.3.8), React 19.2, npm (Node 25 dropped corepack), Tailwind v4 tokens (light/dark), own small components (no shadcn yet). Client-rendered: the browser calls the API directly (ADR-021). Pages: incidents (status filters, cursor paging, scenario replay cards); incident detail (run selector, start/again, live SSE timeline of all nodes with pending/active/done/waiting states, hypotheses with supported marks, evidence panel claimed vs verified with kept and dropped refs and reasons, proposed fix with policy reason, operator approve/reject signed by name with the token in sessionStorage only, `not_offered` notice for public runs, outcome with the ~90 s post-fix check polled, run stats). Stream logic: never close on `run:end` (the post-fix check is stored after it); close on server end and reconnect only if still running, resuming after the last seq. Tests: 24 Vitest (reducer, stream hook with fake EventSource, API client, evidence panel, remediation card) + 6 Playwright (desktop + Pixel 7, API mocked, no sideways scroll). CI job `web`; CodeQL adds javascript-typescript; Dependabot npm; `make web`, `make web-check`. Checked live against the local API: run #73 renders 75% → 38% with the dropped metric and reason; a new recorded run on another incident showed 0 of 2 citations verified → confidence 0 → no action. |
+| 1.0.25 | 13 Oct 2026 | W5 D1: docs only. **ADR-023 outbound-only integration** (design, not built): outside one machine, telemetry and change events are pushed from the customer's side (their Collector with an ingest token; CI/CD steps, flag-tool webhooks and Kubernetes events for changes), notifications go to endpoints the customer creates (Slack incoming webhook, PagerDuty key), actions run through a runner inside their network that polls for approved actions, PRs (if ever) through a GitHub App they install; self-hosting is first-class. README gains "In a real company". New E9.8 ingest token (`/ingest` trusts the network today). E8.3 marked done (PR #52 `RunStats`); E12.4 counts ADR-001–023. Prompted by LinkedIn questions on access, trust and notifications. |
 
 ---
 
@@ -875,6 +877,7 @@ If behind at Week 6: cut E3.5 and E10 polish. Never cut E4, E7.2 or E9.2.
 - Code-regression localiser (map incident → commit → diff)
 - Slack approval flow; PagerDuty/Alertmanager webhook ingest
 - Kubernetes backend for actions
+- **Outbound-only integrations (ADR-023):** `POST /api/v1/changes` (token-authenticated deploy/flag webhooks replacing the local watchers for remote targets); a customer-side action runner that polls for approved actions over HTTPS and reports results (claim/execute/report, idempotent); Slack approvals verified by request signature with the approver recorded in the audit log; a GitHub App that opens revert PRs only if code changes ever leave the non-goals
 - Fine-tuned classifier replacing LLM triage (FR-19 if not done in W12)
 - Multi-tenant + SSO
 - **Connect the real ERP as a second target (first item after freeze).** Instrument `erp-backend` with the OTel SDK (auto-instrumentation for web framework + DB driver, logs bridged with trace IDs) → collector → AegisOps `/ingest`. Add a deploy hook posting `change_events(type=deploy)`. Reuse the compose action backend. Value: validation on unscripted faults with 10–15 real users. Design constraint it imposes **now**: nothing in AegisOps may hardcode demo service names, flags or actions; all target-specific values live in `config/targets/<name>.yaml`.
