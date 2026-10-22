@@ -103,6 +103,34 @@ def test_set_flag_roundtrip(tmp_path: Path) -> None:
     assert current_variant(p, "paymentFailure") == "100%"
     with pytest.raises(ValueError, match="variant"):
         set_flag(p, "paymentFailure", "50%")
+
+
+DEMO_FLAGS = Path(__file__).parent / "data" / "demo.flagd.3.0.0.json"  # the pinned demo's file
+
+
+def test_every_flag_fault_names_real_variants() -> None:
+    """Against the pinned demo's own flag file: S4 and S8 once asked for "on" where the demo
+    has percentages and multipliers, and only failed live, two minutes in."""
+    flags = json.loads(DEMO_FLAGS.read_text())["flags"]
+    for spec in load_catalogue().scenarios:
+        f = spec.fault
+        if isinstance(f, FlagFault):
+            assert f.flag in flags, spec.key
+            assert {f.variant, f.revert} <= set(flags[f.flag]["variants"]), spec.key
+
+
+def test_set_flag_follows_targeting_and_restores_it(tmp_path: Path) -> None:
+    """flagd evaluates targeting first: productCatalogFailure stays inert unless the matching
+    branch changes too (S3, live 22 Oct)."""
+    p = tmp_path / "demo.flagd.json"
+    p.write_text(DEMO_FLAGS.read_text())
+    original = json.loads(p.read_text())["flags"]["productCatalogFailure"]
+    set_flag(p, "productCatalogFailure", "on")
+    flag = json.loads(p.read_text())["flags"]["productCatalogFailure"]
+    assert flag["defaultVariant"] == "on"
+    assert flag["targeting"]["if"][1:] == ["on", "off"]  # the targeted product fails, others not
+    set_flag(p, "productCatalogFailure", "off")
+    assert json.loads(p.read_text())["flags"]["productCatalogFailure"] == original
     with pytest.raises(KeyError):
         set_flag(p, "nope", "off")
 
@@ -223,11 +251,7 @@ async def test_runner_reverts_even_when_no_incident_opens(tmp_path: Path) -> Non
     flagd = tmp_path / "demo.flagd.json"
     flagd.write_text(
         json.dumps(
-            {
-                "flags": {
-                    "cartFailure": {"defaultVariant": "off", "variants": {"off": False, "on": True}}
-                }
-            }
+            {"flags": {"cartFailure": {"defaultVariant": "off", "variants": {"off": 0, "100%": 1}}}}
         )
     )
 
@@ -256,6 +280,22 @@ async def test_runner_reverts_even_when_no_incident_opens(tmp_path: Path) -> Non
     rep = await runner.run(spec)
     assert rep.incident_id is None and "no incident within 30s" in rep.notes
     assert current_variant(flagd, "cartFailure") == "off"
+
+
+async def test_runner_preflight_fails_before_the_warmup(tmp_path: Path) -> None:
+    flagd = tmp_path / "demo.flagd.json"
+    flagd.write_text(
+        json.dumps({"flags": {"cartFailure": {"defaultVariant": "off", "variants": {"off": 0}}}})
+    )
+    slept: list[float] = []
+
+    async def fake_sleep(s: float) -> None:
+        slept.append(s)
+
+    runner = Runner(api="http://api", admin_token="tok", flagd_path=flagd, sleep=fake_sleep)
+    with pytest.raises(ValueError, match="variant '100%' not in"):
+        await runner.run(load_catalogue().get("S4"))
+    assert slept == []  # no warm-up was spent
 
 
 async def test_runner_refuses_unbuilt_overlay(tmp_path: Path) -> None:

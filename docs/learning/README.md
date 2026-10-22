@@ -34,3 +34,4 @@ A day-by-day teaching record of AegisOps: what was built, every term it introduc
 | [20](day-20-2026-10-10-web-ui.md) | 10 Oct | Web UI: direct browser calls (CORS, ADR-021), live investigation page, evidence panel, approvals, Vitest + Playwright (ADR-022) | #51–#52 |
 | [21](day-21-2026-10-13-real-world-integration.md) | 13 Oct | How it would plug into a real company: pushed telemetry and changes, customer-created notification endpoints, a runner inside their network, no PRs by design (ADR-023); the error-rate formula explained | #56 |
 | [22](day-22-2026-10-13-ingest-token.md) | 13 Oct | Ingest bearer token checked before the body, constant-time compare, fail closed in prod (ADR-024) | #57 |
+| [23](day-23-2026-10-22-dev-set-captures.md) | 22 Oct | Production down on billing; dev-set captures S2–S6, S8; flagd targeting and variant bugs; CPU from the usage counter (ADR-025); first agent results incl. a wrong root cause the verifier passed | #62 |

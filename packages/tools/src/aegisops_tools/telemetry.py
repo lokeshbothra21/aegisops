@@ -539,8 +539,7 @@ _CONTAINER_SQL = text(
     """
     SELECT metric_name, date_trunc('minute', ts) AS m, avg(value) AS v
     FROM metric_points
-    WHERE metric_name IN ('container.cpu.utilization', 'container.memory.usage.total',
-                          'container.memory.percent')
+    WHERE metric_name IN ('container.memory.usage.total', 'container.memory.percent')
       AND attrs->'otel.resource'->>'container.name' = :service
       AND ts >= :start AND ts < :end
       AND scenario_id IS NOT DISTINCT FROM :scenario_id
@@ -548,27 +547,50 @@ _CONTAINER_SQL = text(
     """
 )
 
+# CPU cores per minute from the cumulative counter (ns): the rise since the previous minute's
+# last sample over the time between them. A drop (container restart) yields no point.
+_CONTAINER_CPU_SQL = text(
+    """
+    WITH per_min AS (
+        SELECT date_trunc('minute', ts) AS m, max(value) AS v, max(ts) AS t
+        FROM metric_points
+        WHERE metric_name = 'container.cpu.usage.total'
+          AND attrs->'otel.resource'->>'container.name' = :service
+          AND ts >= CAST(:start AS timestamptz) - interval '1 minute' AND ts < :end
+          AND scenario_id IS NOT DISTINCT FROM :scenario_id
+        GROUP BY 1
+    ), deltas AS (
+        SELECT m, v - lag(v) OVER (ORDER BY m) AS dv,
+               extract(epoch FROM t - lag(t) OVER (ORDER BY m)) AS dt
+        FROM per_min
+    )
+    SELECT m, dv / dt / 1e9 AS cores FROM deltas
+    WHERE dv >= 0 AND dt > 0 AND m >= :start
+    ORDER BY m
+    """
+)
+
 
 async def get_container_metrics(
     session: AsyncSession, ctx: ToolContext, service: str, window_minutes: int = 15
 ) -> dict[str, Any]:
-    """Per-minute CPU and memory of the service's container (container name = service name)."""
+    """Per-minute CPU (cores in use) and memory of the service's container (container name =
+    service name)."""
     start, end = ctx.window(window_minutes)
-    rows = (await session.execute(_CONTAINER_SQL, _p(ctx, start, end, service=service))).all()
+    params = _p(ctx, start, end, service=service)
+    rows = (await session.execute(_CONTAINER_SQL, params)).all()
+    cpu = (await session.execute(_CONTAINER_CPU_SQL, params)).all()
     series: dict[str, list[dict[str, Any]]] = {
-        "cpu_utilization": [],
+        "cpu_cores": [{"minute": _iso(m), "value": round(float(c), 3)} for m, c in cpu],
         "memory_bytes": [],
         "memory_percent": [],
     }
     key = {
-        "container.cpu.utilization": "cpu_utilization",
         "container.memory.usage.total": "memory_bytes",
         "container.memory.percent": "memory_percent",
     }
     for name, m, v in rows:
-        series[key[name]].append(
-            {"minute": _iso(m), "value": round(float(v), 3 if name.endswith("utilization") else 1)}
-        )
+        series[key[name]].append({"minute": _iso(m), "value": round(float(v), 1)})
     return {
         "service": service,
         "window": {"start": _iso(start), "end": _iso(end)},

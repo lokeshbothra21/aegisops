@@ -146,9 +146,26 @@ class Runner:
         tagged: dict[str, int] = r.json()["tagged"]
         return tagged
 
+    def preflight(self, spec: ScenarioSpec) -> None:
+        """Fail before the warm-up, not after it: a flag fault's variant and revert must exist in
+        the demo's flag file (live, 22 Oct: S4 and S8 named "on" for flags whose variants are
+        percentages and multipliers, and each failed two minutes in)."""
+        f = spec.fault
+        if not isinstance(f, FlagFault):
+            return
+        flag = json.loads(self.flagd_path.read_text())["flags"].get(f.flag)
+        if flag is None:
+            raise ValueError(f"{spec.key}: flag {f.flag!r} not in {self.flagd_path}")
+        for v in (f.variant, f.revert):
+            if v not in flag["variants"]:
+                raise ValueError(
+                    f"{spec.key}: {f.flag} variant {v!r} not in {sorted(flag['variants'])}"
+                )
+
     async def run(self, spec: ScenarioSpec) -> RunReport:
         t = spec.timing
         rep = RunReport(key=spec.key, started_at=self.now())
+        self.preflight(spec)
         log.info("scenario.start", key=spec.key, warmup_s=t.warmup_s)
         await self.sleep(t.warmup_s)
         rep.fault_at = self.now()

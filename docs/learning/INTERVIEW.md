@@ -52,6 +52,7 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 
 - ★ **How do you debug a wrong answer from the agent?** Open its Langfuse trace: every node's exact prompt, structured answer and answering model; the verifier's span shows what it dropped; scores show claimed vs verified. (Day 18)
 - **Why instrument at seams instead of decorating every node?** One wrapper each for the model client, tool runner and node keeps agent logic tracing-free; nesting comes from the OTel context. (ADR-019)
+- ★ **Your verifier passed a wrong root cause. Why?** It checks that cited evidence exists and matches, not that the conclusion follows: S2's model claimed "no recent changes" with one real citation while correlation had scored the flag flip 0.69. Code still proposed the right fix (flag revert). Next: a contradiction check against correlation; score service, category and fix separately. (Day 23)
 
 ## Web UI
 - ★ **How does the UI show a run live, and survive a dropped connection?** EventSource on the run's SSE stream; events merged by seq (duplicates harmless); on close, check the run's status and reconnect with the last seq only if still running. (Day 20)
@@ -72,6 +73,8 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **Why a p95 ratio to a baseline rather than a fixed threshold?** Endpoints differ 100× in normal latency; a ratio catches regressions everywhere with one rule.
 - **Where does a 60 s detection budget go?** ~6 s sampling wait + ~10 s export interval + ≤30 s to the next tick, ×`for_windows`.
 - **What exactly is the error-rate formula, and what runs it?** Failed ÷ total server-span calls per service over 2 min, from counter deltas (latest − last before the window; a drop means a reset), only with ≥ 5 calls. The alert evaluator, a background loop in the API every 15 s (not an LLM, not an agent tool), compares it with the rule and counts consecutive breaches. (Days 8, 21)
+- ★ **How do you compute CPU from container metrics?** Rate of the cumulative CPU-time counter (Δns ÷ Δs ÷ 10⁹ = cores, resets handled), not a vendor "utilization" gauge you have not verified; docker's acted as a lifetime average on Docker Desktop. Threshold 1.5 cores from measurements (healthy < 0.3, fault ≈ 4). (Day 23, ADR-025)
+- **Why can a memory leak miss a memory alert?** A fast leak is OOM-killed and restarted; memory saw-tooths and a windowed average never crosses. Alert on restarts or peak memory. (Day 23, S8)
 
 ## Incidents and change tracking
 - **How do you prevent duplicate incidents for one outage?** `active_incident(service)` returns the open one; the evaluator attaches rather than opens.
@@ -128,3 +131,4 @@ Grouped by topic. Each answer is the 60-second version; the day files hold the d
 - **How did you make the repo ready for outside contributors?** Community health files (CONTRIBUTING, SECURITY, code of conduct), a setup needing only Postgres because model calls replay from cassettes, issue forms with required repro steps, labelled starter issues with a definition of done, a sign-off check. (Day 19)
 - **DCO or CLA?** DCO: per-commit provenance at almost no friction, inbound = outbound under Apache-2.0. A CLA allows relicensing but adds a legal step where newcomers drop off; open core does not need it. (Day 19, ADR-020)
 - **How would you commercialise an Apache-2.0 project?** Open core or hosting, in separate code you own; anyone else may host it too, which is the price of the trust a permissive licence earns. (Day 19)
+- **A bug in your test harness?** flagd evaluates targeting before the default variant; our fault injection silently did nothing for S3 (zero error spans in the capture gave it away), and the agent's own revert action had the same bug. (Day 23)

@@ -238,6 +238,41 @@ async def container_memory_pct(
     return {c: float(p) for c, p in rows if c}
 
 
+_CONTAINER_CPU_SQL = text(
+    """
+    WITH pts AS (
+        SELECT attrs->'otel.resource'->>'container.name' AS container, value, ts
+        FROM metric_points
+        WHERE metric_name = 'container.cpu.usage.total'
+          AND ts >= CAST(:start AS timestamptz) - interval '5 minutes' AND ts < :end
+          AND scenario_id IS NOT DISTINCT FROM :scenario_id
+    ), latest AS (
+        SELECT DISTINCT ON (container) container, value, ts
+        FROM pts WHERE ts >= :start ORDER BY container, ts DESC
+    ), base AS (
+        SELECT DISTINCT ON (container) container, value, ts
+        FROM pts WHERE ts < :start ORDER BY container, ts DESC
+    )
+    SELECT l.container, (l.value - b.value) / extract(epoch FROM l.ts - b.ts) / 1e9 AS cores
+    FROM latest l JOIN base b USING (container)
+    WHERE l.value >= b.value AND l.ts > b.ts
+    """
+)
+
+
+async def container_cpu_cores(
+    session: AsyncSession, start: datetime, end: datetime, scenario_id: str | None
+) -> Readings:
+    """CPU cores in use per container over the window: the rate of docker_stats'
+    `container.cpu.usage.total` counter (ns). Not `container.cpu.utilization`: on Docker
+    Desktop/OrbStack that behaves like a lifetime average and never falls (live, 22 Oct).
+    A counter that went down (container restarted) gives no reading for that window."""
+    rows = await session.execute(
+        _CONTAINER_CPU_SQL, {"start": start, "end": end, "scenario_id": scenario_id}
+    )
+    return {c: float(cores) for c, cores in rows if c}
+
+
 _KAFKA_LAG_SQL = text(
     """
     SELECT coalesce(attrs->>'group', service) AS grp, max(value) AS lag
@@ -292,5 +327,6 @@ READERS: dict[str, Reader] = {
     "error_count": error_count,
     "p95_ratio": p95_ratio,
     "container_memory_pct": container_memory_pct,
+    "container_cpu_cores": container_cpu_cores,
     "kafka_lag": kafka_lag,
 }

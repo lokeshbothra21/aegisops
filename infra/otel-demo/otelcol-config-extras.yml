@@ -67,8 +67,11 @@ processors:
     error_mode: ignore
     metrics:
       metric:
-        # Drop everything that is NOT on the allowlist.
-        - 'not IsMatch(name, "^(traces\\.span\\.metrics\\.|container\\.(memory\\.usage\\.total|memory\\.percent|cpu\\.utilization|restarts)$|kafka\\.consumer_group\\.lag|http\\.server\\.(request\\.)?duration$|rpc\\.server\\.duration$|app\\.)")'
+        # Drop everything that is NOT on the allowlist. container.cpu.usage.total is the CPU
+        # counter (ns) the alert rule and tools rate into cores; container.cpu.utilization is
+        # kept for comparison only: on Docker Desktop/OrbStack it behaves like a lifetime
+        # average (it never falls), so nothing reads it any more (live, 22 Oct).
+        - 'not IsMatch(name, "^(traces\\.span\\.metrics\\.|container\\.(memory\\.usage\\.total|memory\\.percent|cpu\\.utilization|cpu\\.usage\\.total|restarts)$|kafka\\.consumer_group\\.lag|http\\.server\\.(request\\.)?duration$|rpc\\.server\\.duration$|app\\.)")'
 
 service:
   pipelines:

@@ -28,3 +28,4 @@ One file per decision that shaped the system. Format: Context (the problem and f
 | [022](ADR-022-web-stack.md) | Web UI stack: Next.js 16 (security fixes), client-rendered pages, npm, Tailwind tokens without a component kit, Vitest + Playwright |
 | [023](ADR-023-outbound-only-integration.md) | Outside the laptop, every integration is outbound from the customer: pushed telemetry and changes, notifications to customer-created endpoints, actions through a runner inside their network (design; not built in v1) |
 | [024](ADR-024-ingest-bearer-token.md) | `/ingest` takes a bearer token checked before the body is read; open on a laptop when unset, 503 in production |
+| [025](ADR-025-cpu-from-usage-counter.md) | CPU is the rate of `container.cpu.usage.total` in cores (rule > 1.5 cores), not docker's `container.cpu.utilization`, which acts as a lifetime average on Docker Desktop/OrbStack |

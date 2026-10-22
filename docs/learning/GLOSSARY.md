@@ -38,9 +38,12 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Content-Encoding gzip | Compressed request body; server must inflate; check size before and after | D3 |
 | Context propagation | OTel keeps the current span in a contextvar that follows `await`; children nest automatically | D18 |
 | Conventional Commits | `type(scope): message` commit format | D1 |
+| Cool-down | Waiting after a revert until the system is normal, so the next scenario does not inherit symptoms | D23 |
 | Coordinated disclosure | Reporter tells the maintainer privately, the fix ships, then the issue is published | D19 |
 | CORS | Response headers by which an API lets other origins read it; enforced by browsers, not auth | D20 |
 | Coverage | Share of code lines executed by tests | D3 |
+| CPU cores (from a counter) | Rate of `container.cpu.usage.total`: Δns ÷ Δs ÷ 10⁹ (ADR-025) | D23 |
+| Crash loop | A container repeatedly killed (often OOM) and restarted; memory saw-tooths instead of staying high | D23 |
 | Customer-side runner | Small agent inside a customer's network that polls for approved actions over HTTPS and runs them with local credentials (ADR-023) | D21 |
 | DCO (Developer Certificate of Origin) | A `Signed-off-by:` line per commit certifying you may submit the code under the project licence | D19 |
 | Decorator pattern | Wrap an object in one with the same interface that adds behaviour (`TracedLLM` records, delegates) | D18 |
@@ -66,6 +69,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Fault injection | Deliberately breaking a system (flag toggle) to test response | D4 |
 | Feature flag / flagd | Runtime switch; flagd serves flags from a JSON file it hot-reloads | D0 |
 | Fixture (test) | Reusable test data/setup | D3 |
+| flagd targeting | Rule inside a flag (if product_id is X then A else B), evaluated before defaultVariant | D23 |
 | Flush vs commit | Flush sends SQL inside the open transaction; only commit makes it visible to others | D17 |
 | Full match vs prefix match | Origin regex must match the whole string, or `…vercel.app.evil.example` passes | D20 |
 | Gauge / Sum / Histogram | OTel metric types: value now / counter / bucketed distribution | D3 |
@@ -112,6 +116,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Observability | Understanding a system from its logs, metrics and traces | D0 |
 | Observation (Langfuse) | Langfuse's span, typed: agent, chain, generation, tool | D18 |
 | OIDC token | Short-lived signed identity token GitHub mints per workflow run | D5 |
+| OOM kill | The kernel ends a process that exceeds its memory limit | D23 |
 | Open core | Business model: the core stays open source; a paid edition adds hosting or enterprise features | D19 |
 | Origin | Scheme + host + port; two URLs share an origin only if all three match | D20 |
 | ORM | Python classes mapped to tables (SQLAlchemy declarative) | D2 |
@@ -124,6 +129,7 @@ Alphabetical. "D0" = first appeared on Day 0, etc. Full explanations live in the
 | Pinning by SHA | `uses: action@<commit>`; immutable, unlike tags | D5 |
 | Pipeline (collector) | receivers → processors → exporters for one signal | D4 |
 | pre-commit / detect-secrets | Commit-time checks incl. secret detection with a baseline | D1 |
+| Pre-flight check | Validate inputs before expensive work, so a typo fails in a second, not after the warm-up | D23 |
 | Preflight request | Automatic OPTIONS before a non-simple cross-origin request (custom headers, JSON) | D20 |
 | Private vulnerability reporting | GitHub feature: a private form on the Security tab that opens a draft advisory only maintainers see | D19 |
 | Probe-before-traffic | Deploy no-traffic revision, probe tagged URL, then shift traffic | D5 |

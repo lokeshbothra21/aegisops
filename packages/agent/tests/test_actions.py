@@ -118,6 +118,31 @@ async def test_live_toggle_is_atomic_and_checks_variants(tmp_path: Path) -> None
     assert not missing.ok
 
 
+async def test_live_toggle_off_also_clears_the_targeted_branch(tmp_path: Path) -> None:
+    """Reverting productCatalogFailure must reset its targeting rule too, or the fault stays on."""
+    rule = {"if": [{"==": [{"var": "product_id"}, "OLJCESPC7Z"]}, "on", "off"]}
+    p = tmp_path / "demo.flagd.json"
+    p.write_text(
+        json.dumps(
+            {
+                "flags": {
+                    "productCatalogFailure": {
+                        "defaultVariant": "on",
+                        "variants": {"off": False, "on": True},
+                        "targeting": rule,
+                    }
+                }
+            }
+        )
+    )
+    out = await LiveBackend(flagd_path=p).run(
+        Action.toggle_flag, {"flag": "productCatalogFailure", "variant": "off"}
+    )
+    assert out.ok
+    flag = json.loads(p.read_text())["flags"]["productCatalogFailure"]
+    assert flag["defaultVariant"] == "off" and flag["targeting"]["if"][1:] == ["off", "off"]
+
+
 async def test_live_restart_uses_fixed_docker_endpoints(tmp_path: Path) -> None:
     seen: list[tuple[str, str]] = []
 

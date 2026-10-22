@@ -127,7 +127,7 @@ async def test_container_metrics_series(scenario) -> None:  # type: ignore[no-un
     s, ctx, _ = scenario
     r = await telemetry.get_container_metrics(s, ctx, "payment", window_minutes=15)
     assert len(r["memory_bytes"]) == 3 and r["memory_bytes"][-1]["value"] == 102000000.0
-    assert r["cpu_utilization"][0]["value"] == 0.1 and r["memory_percent"] == []
+    assert [p["value"] for p in r["cpu_cores"]] == [0.1, 0.2] and r["memory_percent"] == []
 
 
 async def test_similar_incidents_is_an_honest_stub(scenario) -> None:  # type: ignore[no-untyped-def]

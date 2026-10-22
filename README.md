@@ -4,11 +4,11 @@
 
 `agentic-ai` · `llm-agents` · `langgraph` · `mcp` · `opentelemetry` · `observability` · `aiops` · `sre` · `incident-response` · `root-cause-analysis` · `fastapi` · `postgresql`
 
-> Status: **Week 4 of 13**, ahead of plan. Production runs on Cloud Run + Supabase in public mode (investigates and proposes, never executes). Live API: [`aegisops-api…run.app/livez`](https://aegisops-api-875836872466.asia-south1.run.app/livez). Public replay demo, benchmark table and video arrive with Milestone M1 (31 Oct) and M2 (22 Dec). Master plan: [`docs/PROJECT.md`](docs/PROJECT.md).
+> Status: **Week 6 of 13**. Features ahead of plan; dev-set captures S1–S6 and S8 done 22 Oct (S7 needs Kafka). Production runs on Cloud Run + Supabase in public mode (investigates and proposes, never executes). Live API: [`aegisops-api…run.app/livez`](https://aegisops-api-875836872466.asia-south1.run.app/livez). Public replay demo, benchmark table and video arrive with Milestone M1 (31 Oct) and M2 (22 Dec). Master plan: [`docs/PROJECT.md`](docs/PROJECT.md).
 
 ## What it does
 
-- **Detects** incidents from rules over SQL aggregates (error rate, error bursts, p95 vs baseline, memory, Kafka lag), not from an LLM. Measured live: fault → open incident in **57 s**, zero false positives in warm-up.
+- **Detects** incidents from rules over SQL aggregates (error rate, error bursts, p95 vs baseline, memory, CPU cores, Kafka lag), not from an LLM. Measured live: fault → open incident in **57 s**, zero false positives in warm-up.
 - **Investigates** with a fixed LangGraph: triage → plan → investigate → correlate changes → root cause → verify evidence. Nine read-only telemetry tools, every result wrapped as untrusted data, ≤ 4 KB each.
 - **Correlates what changed**: flag flips, deploys, restarts and scale events are recorded as they happen and scored by recency and dependency proximity.
 - **Verifies before it speaks**: every cited trace, log, metric or change is checked against the store; numbers must be within ±20 %; unverifiable citations are dropped and confidence is scaled down. On its first real run the model claimed 0.86 with an invented metric name; the verifier returned 0.57 and said why.
@@ -59,6 +59,19 @@ Not yet. The benchmark (12 faults + 3 noise scenarios × 3 episodes × 4 agent v
 | Confidence | 0.86 | **0.57** |
 | Evidence | 3 citations | 2 kept, 1 dropped: invented metric name |
 
+**First captures of the dev set (22 Oct, one episode each, live detection + one replay with Gemini 3.5 Flash → Groq fallback).** Not the benchmark: no repeats, no variants, and the scoring rules are still open (see the category column).
+
+| Scenario | Fault | Detected in | Service | Category: agent (expected) | Fix proposed | Confidence claimed → verified |
+|---|---|---|---|---|---|---|
+| S1 | `paymentFailure` 100% | 69 s | ✅ payment | `config_regression` (`dependency_errors`) | – (23 Sep, before remediation) | 0.86 → 0.57 |
+| S2 | `paymentUnreachable` | 37 s | ✅ checkout | ❌ `app_bug` (`dependency_down`) | ✅ revert the flag | 0.85 → 0.85 |
+| S3 | `productCatalogFailure` | 55 s | ✅ product-catalog | `config_regression` (`app_bug`) | ✅ revert the flag | 0.85 → 0.85, partial |
+| S4 | `cartFailure` 100% | 205 s | ✅ cart | `config_regression` (`datastore_failure`) | ✅ revert the flag | 0.78 → **0.52** (invented `cart_error_rate` dropped) |
+| S5 | `recommendationCacheFailure` | 268 s (p95 rule) | ✅ recommendation | `config_regression` (`memory_leak`) | ✅ revert the flag | 0.95 → 0.95 |
+| S6 | `adHighCpu` | 81 s (new CPU rule) | ✅ ad | `config_regression` (`cpu_saturation`) | ✅ revert the flag | 0.95 → 0.95 |
+| S7 | `kafkaQueueProblems` | not run: needs the full demo (Kafka) | | | | |
+| S8 | `emailMemoryLeak` 1000× | **missed** (crash loop, below) | | | | |
+
 ## Safety model
 
 1. **Detection and verification are deterministic code.** The LLM proposes; code decides there is an incident and checks every claim (ADR-008).
@@ -76,6 +89,12 @@ Recorded as they happen, not curated later:
 1. **Confidently wrong on day one.** With no change correlation, the model blamed a "connection refused" log and a `0 calls` reading for a service that had *no data*. Fixes: tools now say "no data" explicitly, changes are scored and handed to the model, and the verifier cuts confidence for unverifiable citations.
 2. **Invented metric names.** `payment_error_rate` looks right and does not exist; dropped by the verifier.
 3. **Detection has a traffic floor.** At the demo's default load the payment path sees ~5 calls/min; statistically confident detection within 60 s of the fault is at the edge. Documented in [Day 8](docs/learning/day-08-2026-09-20-alert-evaluator.md).
+
+4. **A real citation can carry a wrong conclusion (S2).** The model said `app_bug` and "no recent configuration changes" while change correlation had scored the `paymentUnreachable` flip at 0.69. Its one citation (the error rate) was real, so the verifier kept 0.85. The verifier checks that evidence exists, not that the conclusion follows; the flag-revert rule in remediation still proposed the right fix.
+5. **Every flag fault reads as `config_regression`.** All dev faults are injected with feature flags, and the model names the flag as the cause (true) instead of the mechanism the catalogue expects (`memory_leak`, `cpu_saturation`, …). Scoring has to decide which is right before the benchmark; recorded, not tuned away.
+6. **A fast memory leak is a crash loop, and the memory rule misses it (S8).** At 1000× the email container is OOM-killed and restarted; its memory saw-tooths between 50 % and 88 %, so a 2-minute average never holds above 90 %. Candidates: a restart-rate rule or peak memory.
+7. **Our own harness had bugs the captures found.** The runner set only a flag's default, but flagd evaluates targeting first, so S3's fault never fired (zero error spans; the "miss" was correct). S4 and S8 named variants the demo does not have. Docker's `container.cpu.utilization` behaves like a lifetime average on Docker Desktop/OrbStack, so CPU now comes from the usage counter ([ADR-025](docs/adr/ADR-025-cpu-from-usage-counter.md)).
+8. **Infrastructure containers trip the memory rule.** opensearch and prometheus sit above 90 % of their limits and opened incidents during captures. Recorded in the fixtures as noise.
 
 More in [`docs/learning/`](docs/learning/README.md), a day-by-day teaching log of everything built, every term, and what broke.
 
@@ -98,7 +117,7 @@ uv run aegis-investigate ... --recorded packages/agent/tests/cassettes/s1_paymen
 uv run aegis-telemetry                         # the read tools as an MCP server (stdio)
 curl -X POST localhost:8000/api/v1/incidents/<id>/runs -d '{}' -H 'content-type: application/json'   # start a run
 curl -N localhost:8000/api/v1/runs/<run>/events   # live SSE stream; approve with POST /runs/<run>/approve
-make check                                     # lint, types, 201 tests against Postgres (same as CI)
+make check                                     # lint, types, 206 tests against Postgres (same as CI)
 make web-check                                 # web lint, types, 24 unit + 6 Playwright tests
 ```
 
@@ -134,7 +153,7 @@ Or **self-host**: it is Apache-2.0, so the whole system can run inside the compa
 
 ## Tech stack
 
-Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (201 tests) · Next.js 16 · React 19 · Tailwind v4 · Vitest · Playwright · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
+Python 3.13 · uv · FastAPI · SQLAlchemy 2 (async) · Alembic · Postgres 17 + pgvector · OpenTelemetry Collector (tail sampling, OTTL) · LangGraph 1.x with Postgres checkpoints · MCP SDK 2 · Gemini 3.5 Flash / Groq gpt-oss-120b via a 100-line router · pytest (206 tests) · Next.js 16 · React 19 · Tailwind v4 · Vitest · Playwright · ruff · mypy --strict · GitHub Actions (CI, CodeQL, dependency review, Dependabot, keyless Cloud Run deploy) · Docker · Cloud Run.
 
 ## Repository map
 

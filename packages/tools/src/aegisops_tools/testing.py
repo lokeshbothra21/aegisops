@@ -98,12 +98,12 @@ async def seed_payment_failure(engine: AsyncEngine, sc: str) -> None:
                 text("""
                 INSERT INTO metric_points (ts, service, metric_name, value, attrs, scenario_id) VALUES
                 (:ts, 'unknown_service', 'container.memory.usage.total', :mem, '{"otel.resource": {"container.name": "payment"}}', :sc),
-                (:ts, 'unknown_service', 'container.cpu.utilization', :cpu, '{"otel.resource": {"container.name": "payment"}}', :sc)
+                (:ts, 'unknown_service', 'container.cpu.usage.total', :cpu, '{"otel.resource": {"container.name": "payment"}}', :sc)
             """),
                 {
                     "ts": NOW - timedelta(minutes=3 - i),
                     "mem": 100e6 + i * 1e6,
-                    "cpu": 0.1 * (i + 1),
+                    "cpu": [0, 6e9, 18e9][i],  # ns counter: 0.1 then 0.2 cores per minute
                     "sc": sc,
                 },
             )

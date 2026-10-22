@@ -21,6 +21,11 @@ def main(path: str, name: str, variant: str) -> None:
         sys.exit(f"{name}: variant {variant!r} not in {list(flag['variants'])}")
     previous = flag["defaultVariant"]
     flag["defaultVariant"] = variant
+    # flagd evaluates `targeting` first; the matching branch follows the variant (see
+    # packages/bench/src/aegisops_bench/flags.py: follow_targeting).
+    rule = flag.get("targeting", {}).get("if")
+    if isinstance(rule, list) and len(rule) == 3 and rule[1] in flag["variants"]:
+        rule[1] = variant
     with open(path, "w") as f:
         json.dump(doc, f, indent=2)
         f.write("\n")

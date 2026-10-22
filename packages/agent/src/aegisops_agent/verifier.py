@@ -5,7 +5,7 @@ For each EvidenceRef in the root cause:
   log     ref_id is a log signature or a body fragment that must match a log line;
           a numeric claim is compared with the number of matching lines
   metric  ref_id names a quantity the tools expose (error_rate, calls, errors, p95_ms,
-          p50_ms, p99_ms, error_count, memory_bytes, cpu_utilization, container_memory_pct)
+          p50_ms, p99_ms, error_count, memory_bytes, cpu_cores, container_memory_pct)
           or a raw metric name; a numeric claim is recomputed and must be within ±20 %
   change  ref_id must match a change event in the window (ISO timestamp within 60 s, or a
           flag / service / type token that appears in the event)
@@ -173,7 +173,7 @@ class Verifier:
                 if r["errors_per_minute"]
                 else None
             )
-        if name in ("memory_bytes", "cpu_utilization", "container_memory_pct"):
+        if name in ("memory_bytes", "cpu_cores", "container_memory_pct"):
             r = await telemetry.get_container_metrics(session, self.ctx, service, window_minutes=w)
             key = "memory_percent" if name == "container_memory_pct" else name
             pts = r.get(key) or []

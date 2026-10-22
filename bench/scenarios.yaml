@@ -28,10 +28,12 @@ scenarios:
   - key: S4
     title: Cart datastore failure
     set: dev
-    fault: {type: flag, flag: cartFailure, variant: "on"}
+    fault: {type: flag, flag: cartFailure, variant: "100%"}
     expected_service: cart
     expected_category: datastore_failure
     expected_actions: [toggle_flag, restart_service]
+    # cart sees few calls at 5 VUs: detected at 205 s live (22 Oct), past the 180 s default
+    timing: {incident_timeout_s: 300}
   - key: S5
     title: Recommendation cache leak
     set: dev
@@ -59,7 +61,7 @@ scenarios:
   - key: S8
     title: Email service memory leak
     set: dev
-    fault: {type: flag, flag: emailMemoryLeak, variant: "on"}
+    fault: {type: flag, flag: emailMemoryLeak, variant: "1000x"}
     expected_service: email
     expected_category: memory_leak
     expected_actions: [restart_service, toggle_flag]

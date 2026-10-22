@@ -206,7 +206,7 @@ async def test_remaining_verifier_branches(engine: AsyncEngine, scenario) -> Non
                     kind="metric", ref_id="memory_bytes", claim="102 MB", claimed_value=102_000_000
                 ),
                 EvidenceRef(
-                    kind="metric", ref_id="cpu_utilization", claim="0.3 cpu", claimed_value=0.3
+                    kind="metric", ref_id="cpu_cores", claim="0.2 cores", claimed_value=0.2
                 ),
                 EvidenceRef(kind="metric", ref_id="container_memory_pct", claim="no such series"),
                 EvidenceRef(
@@ -230,7 +230,7 @@ async def test_remaining_verifier_branches(engine: AsyncEngine, scenario) -> Non
     assert {
         "error_count",
         "memory_bytes",
-        "cpu_utilization",
+        "cpu_cores",
         "container.memory.usage.total",
         "p50_ms",
     } <= kept, dropped

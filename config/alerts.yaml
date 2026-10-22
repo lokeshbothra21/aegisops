@@ -31,6 +31,12 @@ rules:
     threshold: 90
     window_s: 120
     for_windows: 3
+  - name: container-cpu-high
+    metric: container_cpu_cores   # rate of docker_stats container.cpu.usage.total (ns) -> cores
+    comparator: ">"
+    threshold: 1.5                # healthy demo containers < 0.3 (load-generator); adHighCpu ~4
+    window_s: 120
+    for_windows: 2
   - name: kafka-consumer-lag
     metric: kafka_lag             # kafka.consumer_group.lag, max over window (full demo mode only)
     comparator: ">"

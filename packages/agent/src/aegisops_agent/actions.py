@@ -37,6 +37,17 @@ LABEL_PROJECT = "com.docker.compose.project"
 LABEL_SERVICE = "com.docker.compose.service"
 
 
+def follow_targeting(flag: dict[str, Any], variant: str) -> None:
+    """flagd evaluates `targeting` before `defaultVariant`. The demo's targeted flags look like
+    {"if": [condition, <match>, <else>]} (productCatalogFailure fails one product id), and its
+    UI turns them on by setting <match>: do the same, so the matching branch follows the variant.
+    Setting "off" restores the demo's original rule. Live, 22 Oct: editing only defaultVariant
+    left S3's fault inert (zero error spans)."""
+    rule = flag.get("targeting", {}).get("if")
+    if isinstance(rule, list) and len(rule) == 3 and rule[1] in flag["variants"]:
+        rule[1] = variant
+
+
 class ActionRejectedError(Exception):
     """Validation failed; nothing was executed."""
 
@@ -158,6 +169,7 @@ class LiveBackend:
             )
         before = spec["defaultVariant"]
         spec["defaultVariant"] = variant
+        follow_targeting(spec, variant)
         tmp = self.flagd_path.with_suffix(".aegis.tmp")
         tmp.write_text(json.dumps(doc, indent=2) + "\n")
         tmp.replace(self.flagd_path)  # atomic: flagd never reads a half-written file

@@ -214,6 +214,39 @@ async def test_container_memory_and_kafka_readers(settings: Settings) -> None:
     assert lag == {"accounting": 1500.0}
 
 
+async def test_container_cpu_cores_is_the_counter_rate(settings: Settings) -> None:
+    """Cores = rise of the ns counter from the last sample before the window to the latest in
+    it, over the time between them. A counter that fell (restart) gives no reading."""
+    engine = create_engine(settings)
+    factory = create_session_factory(engine)
+    sc = f"T-{uuid4().hex[:8]}"
+    series = {
+        "ad": [(-150, 10e9), (-90, 70e9), (-30, 250e9)],  # 240e9 ns over 120 s = 2.0 cores
+        "cart": [(-150, 5e9), (-30, 1e9)],  # restarted: no reading
+        "email": [(-30, 3e9)],  # no sample before the window: no reading
+    }
+    try:
+        async with factory() as s:
+            for container, points in series.items():
+                for dt, v in points:
+                    s.add(
+                        MetricPoint(
+                            ts=NOW + timedelta(seconds=dt),
+                            service="unknown_service",
+                            metric_name="container.cpu.usage.total",
+                            value=v,
+                            unit="ns",
+                            attrs={"otel.resource": {"container.name": container}},
+                            scenario_id=sc,
+                        )
+                    )
+            await s.commit()
+            cpu = await readers.container_cpu_cores(s, NOW - WINDOW, NOW, sc)
+    finally:
+        await engine.dispose()
+    assert cpu == {"ad": pytest.approx(2.0)}
+
+
 # --- evaluator ------------------------------------------------------------------
 
 

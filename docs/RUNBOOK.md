@@ -32,6 +32,10 @@ Operational situations and what to do. Started Week 1 (PROJECT.md §17); grows w
 
 | Situation | Action |
 |---|---|
+| A flag fault has no effect (no errors after `make flag` / a scenario) | Look at the flag in `demo.flagd.json`: flagd evaluates `targeting` before `defaultVariant`. Our setters move the matching branch with the variant (22 Oct); a hand edit must do the same. `productCatalogFailure` is the only targeted flag in demo 3.0.0. |
+| CPU numbers look like they only ever go up | That is docker_stats `container.cpu.utilization` on Docker Desktop/OrbStack (a lifetime average). Use `cpu_cores` (the tool) / `container_cpu_cores` (the rule), computed from `container.cpu.usage.total` (ADR-025). |
+| An old incident never auto-resolves | Auto-resolve needs the incident's `alert_rule_id` to match a current rule; API tests share the local DB and rewrite `alert_rules`. Resolve it by hand (`UPDATE incidents SET status='resolved', closed_at=now() ... WHERE id=…`) and say why in `summary`; never touch rows with a `scenario_id`. Do not run `make check` during a capture. |
+| Production 5xx with `BILLING_DISABLED` in logs | The GCP billing account was closed or suspended (22 Oct). Reopen it in the console; Cloud Run then needs ~20 min before instances start (429 "no available instance" meanwhile). Then `gh workflow run deploy-api.yml`. |
 | Collector export fails with 401 (`ingest` warnings in its logs) | The API has `AEGIS_INGEST_TOKEN` set and the collector sent none or another value. Set `AEGISOPS_INGEST_TOKEN` to the same value (shell or `infra/otel-demo/aegisops.env`), then `make demo-up`. The collector does not retry 4xx, so those batches are lost. |
 | `/ingest` answers 503 "Ingest disabled" | `AEGIS_ENV=prod` with no `AEGIS_INGEST_TOKEN`: fails closed by design. Production gets data from scenario imports, not ingest. For a real producer, add the secret (`aegis-ingest-token`) and mount it. |
 | Local DB growing / disk | Retention runs hourly in the API while it is up; force it: `curl -X POST -H "X-Admin-Token: $AEGIS_ADMIN_TOKEN" localhost:8000/api/v1/admin/retention/run`. Tagged (`scenario_id`) rows are never deleted. |
