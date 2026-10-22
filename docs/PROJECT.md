@@ -150,7 +150,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 |---|---|---|---|---|
 | E2.1 | flagd config watcher → `change_events(type=flag)` | M | W2 | done (PR #15) |
 | E2.2 | Deploy/restart/scale events from compose labels + action executor | M | W2/W6 | done (observation PR #17; executor PR #28) |
-| E2.3 | Alert rules table + evaluator (5xx rate, p95 vs baseline, memory, Kafka lag) | M | W2 | done (PR #16); CPU-cores rule `container-cpu-high` added 22 Oct (PR #62, ADR-025) |
+| E2.3 | Alert rules table + evaluator (5xx rate, p95 vs baseline, memory, Kafka lag) | M | W2 | done (PR #16); CPU-cores rule `container-cpu-high` added 22 Oct (PR #64, ADR-025) |
 | E2.4 | Incident lifecycle: open → investigating → awaiting_approval → remediating → resolved/failed | M | W2 | done (PR #15: tables, state machine, read API; evaluator opens incidents in E2.3) |
 
 ### E3 — Investigation agent
@@ -189,7 +189,7 @@ Status values: `todo · doing · done · cut`. Update weekly (§23).
 | ID | Feature | Pri | Week | Status |
 |---|---|---|---|---|
 | E7.1 | `bench/scenarios.yaml`: 12 faults + 3 noise + S13 injection, expected category/service/action | M | W4/W8 | done (PR #26; S9–S12 overlays are placeholders until E7.3) |
-| E7.2 | Scenario runner (toggle flags / apply overlays / wait / capture) | M | W4 | done for flag faults + S13 injection (PR #26); overlays with E7.3. **Captured live 22 Oct: S2–S6, S8** (S7 needs the full demo); flagd targeting + variant pre-flight fixed (PR #62) |
+| E7.2 | Scenario runner (toggle flags / apply overlays / wait / capture) | M | W4 | done for flag faults + S13 injection (PR #26); overlays with E7.3. **Captured live 22 Oct: S2–S6, S8** (S7 needs the full demo); flagd targeting + variant pre-flight fixed (PR #64) |
 | E7.3 | Custom fault overlays S9–S12 | M | W8 | todo |
 | E7.4 | Benchmark runner: episodes × variants × models → `bench_results` | M | W9 | todo |
 | E7.5 | Metrics + report generator (markdown + JSON) | M | W9 | todo |

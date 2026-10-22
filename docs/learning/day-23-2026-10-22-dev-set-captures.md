@@ -1,4 +1,4 @@
-# Day 23 · 22 Oct 2026 · Capturing the dev set, and everything it exposed (PR #62, ADR-025)
+# Day 23 · 22 Oct 2026 · Capturing the dev set, and everything it exposed (PR #64, ADR-025)
 
 ## Why
 Milestone M1 (31 Oct) is "the public URL replays S1–S8". Until today only S1 was captured. A capture is a recording: we break the demo shop on purpose, let AegisOps detect it, fix it, and save that window of telemetry, so the agent can be replayed on it any time without a live shop.
