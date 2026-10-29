@@ -109,6 +109,8 @@ make demo-up                                   # pinned OTel Demo + our collecto
 make flag name=paymentFailure variant=100%     # inject a fault; an incident opens within ~60 s
 ```
 
+To send your own app's telemetry instead of the demo's, see [docs/CONNECT.md](docs/CONNECT.md).
+
 Investigate an incident (needs `AEGIS_GEMINI_API_KEY` / `AEGIS_GROQ_API_KEY` in `.env`, or `--recorded` for a model-free replay):
 
 ```bash
