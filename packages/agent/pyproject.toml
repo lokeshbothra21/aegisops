@@ -6,7 +6,7 @@ requires-python = ">=3.13,<3.14"
 dependencies = [
     "aegisops-tools",
     "httpx>=0.28",
-    "langfuse>=4.17,<5",
+    "langfuse>=4.17,<6",
     "langgraph>=1.0",
     "langgraph-checkpoint-postgres>=2.0",
     "psycopg[binary,pool]>=3.2",
